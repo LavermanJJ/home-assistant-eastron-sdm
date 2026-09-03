@@ -1,4 +1,10 @@
-# Eastron SDM for Home Assistant
+<p align="center">
+  <a href="https://github.com/lavermanjj/home-assistant-eastron-sdm">
+    <img src="https://brands.home-assistant.io/eastron/logo.png" alt="Logo" height="80">
+  </a>
+</p>
+
+<h3 align="center">Home Assistant Eastron SDM integration</h3>
 
 A Home Assistant integration for Eastron SDM energy meters over Modbus, built on
 Home Assistant's shared Modbus connection manager.
