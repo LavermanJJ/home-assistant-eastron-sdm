@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://github.com/lavermanjj/home-assistant-eastron-sdm">
-    <img src="https://brands.home-assistant.io/eastron/logo.png" alt="Logo" height="80">
+    <img src="https://raw.githubusercontent.com/LavermanJJ/home-assistant-eastron-sdm/main/custom_components/eastron_sdm/brand/logo%402x.png" alt="Eastron SDM" height="80">
   </a>
 </p>
 
