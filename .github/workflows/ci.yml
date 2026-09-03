@@ -19,13 +19,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      # Advisory only while this repository is private: the hacsjson and
-      # integration_manifest checks read raw file content from GitHub, which
-      # is not visible on a private repository, so they fail on content they
-      # cannot fetch rather than on anything wrong. Drop continue-on-error
-      # once the repository is public.
+      # Blocking. The repository is public, so every check the action runs --
+      # including hacsjson and integration_manifest, which read raw file
+      # content from GitHub -- has something to read. All nine are a listed
+      # requirement for the HACS default store, so a regression in one is a
+      # failure rather than a note.
       - uses: hacs/action@main
-        continue-on-error: true
         with:
           category: integration
 
