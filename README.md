@@ -195,4 +195,4 @@ to a plausible number rather than to an error.
 
 ## Licence
 
-MIT.
+Apache License 2.0. See [LICENSE](LICENSE).
