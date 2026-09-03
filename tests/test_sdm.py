@@ -7,6 +7,7 @@ import pytest
 
 from custom_components.eastron_sdm.sdm import (
     MEASUREMENTS,
+    METER_CODES,
     SdmMeter,
     SdmModel,
     async_probe,
@@ -136,3 +137,60 @@ async def test_probe_propagates_a_dead_bus() -> None:
 
     with pytest.raises(ModbusTimeoutError):
         await async_probe(unit)
+
+
+def test_sdm120ct_shares_the_sdm120_map() -> None:
+    """The CT variant changes how current is sensed, not which registers report it.
+
+    Its protocol document lists the same twenty-one addresses, so it shares the
+    component rather than duplicating the table -- while keeping its own model
+    name, which is what the device page shows.
+    """
+    assert MEASUREMENTS[SdmModel.SDM120CT] is MEASUREMENTS[SdmModel.SDM120]
+
+
+def test_sdm230_is_the_sdm120_map_plus_phase_angle() -> None:
+    """Stated as a subclass, so the difference is the whole declaration."""
+    sdm120 = set(MEASUREMENTS[SdmModel.SDM120].declared_fields)
+    sdm230 = set(MEASUREMENTS[SdmModel.SDM230].declared_fields)
+
+    assert sdm230 - sdm120 == {"phase_angle"}
+    assert not sdm120 - sdm230
+
+
+def test_sdm630mct_extends_the_sdm630_map() -> None:
+    """The MCT adds reactive power demand and the resettable counters."""
+    sdm630 = set(MEASUREMENTS[SdmModel.SDM630].declared_fields)
+    mct = set(MEASUREMENTS[SdmModel.SDM630MCT].declared_fields)
+
+    assert mct - sdm630 == {
+        "total_system_reactive_power_demand",
+        "maximum_total_system_reactive_power_demand",
+        "resettable_total_active_energy",
+        "resettable_total_reactive_energy",
+        "resettable_import_active_energy",
+        "resettable_export_active_energy",
+        "resettable_import_reactive_energy",
+        "resettable_export_reactive_energy",
+    }
+    assert not sdm630 - mct
+
+
+def test_the_two_sdm72d_meters_are_not_interchangeable() -> None:
+    """They share a name and a meter-code neighbourhood but not a register map.
+
+    The -M-1 is an energy meter with no voltage or current at all; picking the
+    wrong one would leave most entities permanently unavailable.
+    """
+    m1 = set(MEASUREMENTS[SdmModel.SDM72D].declared_fields)
+    v2 = set(MEASUREMENTS[SdmModel.SDM72DM_V2].declared_fields)
+
+    assert "voltage_l1" not in m1
+    assert "voltage_l1" in v2
+    assert m1 - v2 == set(), "the -M-1 measures nothing the V2 does not"
+
+
+def test_every_model_has_a_distinct_meter_code() -> None:
+    """A code must not resolve to two models, or detection is a coin toss."""
+    assert len(set(METER_CODES.values())) == len(METER_CODES)
+    assert set(METER_CODES.values()) <= set(SdmModel)
