@@ -15,6 +15,36 @@ from custom_components.eastron_sdm.sdm import (
 
 from .conftest import SERIAL_NUMBER, build_unit
 
+#: The per-request ceiling each model's protocol document states, in
+#: registers. Duplicated from the documents on purpose: asserting that a read
+#: fits inside ``max_span`` only proves the planner honours the number it was
+#: given, so the number itself has to be pinned against the paperwork.
+#:
+#:   80  "maximum of 40 values in a single transaction; therefore the maximum
+#:        number of registers requestable is 80"
+#:   60  "Each request for data must be restricted to 30 parameters or less"
+DOCUMENTED_LIMITS = {
+    SdmModel.SDM120: 80,
+    SdmModel.SDM120CT: 80,
+    SdmModel.SDM230: 80,
+    SdmModel.SDM630: 80,
+    SdmModel.SDM630MCT: 60,
+    SdmModel.SDM72D_M_1: 60,
+    SdmModel.SDM72DM_V2: 60,
+}
+
+
+@pytest.mark.parametrize("model", list(SdmModel))
+def test_max_span_matches_the_protocol_document(model: SdmModel) -> None:
+    """The declared limit must be the one the manual states.
+
+    This is the assertion that actually holds the SDM72D pair and the
+    SDM630MCT to 60 registers. Raising one of them back to the SDM630's 80
+    would sail past a read-fits-in-max_span check while real hardware
+    rejected the block and took the whole poll down with it.
+    """
+    assert MEASUREMENTS[model].max_span == DOCUMENTED_LIMITS[model]
+
 
 @pytest.mark.parametrize("model", list(SdmModel))
 async def test_every_block_read_is_legal(model: SdmModel) -> None:
@@ -22,8 +52,17 @@ async def test_every_block_read_is_legal(model: SdmModel) -> None:
 
     Section 1.2 of the SDM630 document: a start address and a register count
     must both be even, because every parameter is a float spanning two
-    registers, and no request may exceed 80 registers.
+    registers.
+
+    The per-request ceiling is not the same across the range: the SDM120,
+    SDM120CT, SDM230 and SDM630 allow 40 values (80 registers), while the
+    SDM72D pair and the SDM630MCT allow only 30 (60). So each model is checked
+    against its own declared limit -- asserting the most generous one would
+    pass a request the stricter meters reject.
     """
+    limit = MEASUREMENTS[model].max_span
+    assert limit <= 80, "80 registers is the most any SDM documents"
+
     unit = build_unit(model)
     meter = SdmMeter(unit, model)
     await meter.async_setup()
@@ -34,11 +73,22 @@ async def test_every_block_read_is_legal(model: SdmModel) -> None:
     for event in unit.read_events:
         assert event.address % 2 == 0, f"odd start address 0x{event.address:04X}"
         assert event.count % 2 == 0, f"odd register count {event.count}"
-        assert event.count <= 80, f"{event.count} registers exceeds the 80 limit"
+        assert event.count <= limit, (
+            f"{event.count} registers exceeds this model's {limit} limit"
+        )
 
 
 @pytest.mark.parametrize(
-    ("model", "expected_reads"), [(SdmModel.SDM120, 4), (SdmModel.SDM630, 4)]
+    ("model", "expected_reads"),
+    [
+        (SdmModel.SDM120, 4),
+        (SdmModel.SDM120CT, 4),
+        (SdmModel.SDM230, 4),
+        (SdmModel.SDM630, 4),
+        (SdmModel.SDM630MCT, 6),
+        (SdmModel.SDM72D_M_1, 6),
+        (SdmModel.SDM72DM_V2, 6),
+    ],
 )
 async def test_poll_is_a_handful_of_reads(model: SdmModel, expected_reads: int) -> None:
     """A poll must not degrade into one request per field.
@@ -182,7 +232,7 @@ def test_the_two_sdm72d_meters_are_not_interchangeable() -> None:
     The -M-1 is an energy meter with no voltage or current at all; picking the
     wrong one would leave most entities permanently unavailable.
     """
-    m1 = set(MEASUREMENTS[SdmModel.SDM72D].declared_fields)
+    m1 = set(MEASUREMENTS[SdmModel.SDM72D_M_1].declared_fields)
     v2 = set(MEASUREMENTS[SdmModel.SDM72DM_V2].declared_fields)
 
     assert "voltage_l1" not in m1

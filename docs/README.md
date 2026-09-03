@@ -37,8 +37,12 @@ links above are the ones served directly.
   §1.1 and repeating the SDM630's "40 parameters" in §1.2. The integration
   takes the smaller figure: a rejected request costs every field in the block.
 
-  `tests/test_sdm.py::test_every_block_read_is_legal` asserts all of this per
-  model, against that model's own declared limit.
+  Two tests hold this. `test_max_span_matches_the_protocol_document` pins each
+  model's declared `max_span` against the figure in its manual — the table in
+  the test is duplicated from the documents on purpose, because asserting that
+  a read fits inside `max_span` only proves the planner honours the number it
+  was given. `test_every_block_read_is_legal` then checks the even start
+  address, the even count, and that no block exceeds that model's limit.
 - The network settings block (`0x0012` parity/stop, `0x0014` node address,
   `0x001C` baud rate) is documented for **every** model above, which is what
   lets `SdmNetworkSettings` be model independent.
@@ -47,6 +51,22 @@ links above are the ones served directly.
   is **not** documented — V1.8 lists only the serial number — and the value in
   `sdm/const.py` comes from field reports. The SDM120CT and SDM230 manuals
   document no meter code, so those two always reach the model-selection step.
+
+## Reading across undocumented addresses
+
+Declaring a `register_ranges` entry tells the planner it may merge reads across
+everything inside it, `max_span` permitting — including addresses between the
+documented parameters. That is usually what you want: the SDM family shares one
+firmware map, the holes are the same registers other models populate, and
+merging is what keeps a poll to a handful of round trips.
+
+It stops being reasonable when a range is mostly hole. The SDM72D-M-1 declares
+four parameters between `0x000C` and `0x0035`; a single range there produced one
+42-register read spanning `0x0012`–`0x0033`, which that meter's manual does not
+describe at all. An illegal-data-address answer to any of them fails the whole
+block, so all twelve of its entities would have gone unavailable every poll,
+including the ones that read fine. Its ranges are now tight around the fields:
+one extra round trip, and 26 registers on the wire instead of 60.
 
 ## Known gaps
 

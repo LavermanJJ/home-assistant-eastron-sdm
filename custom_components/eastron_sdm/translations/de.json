@@ -39,7 +39,14 @@
       },
       "model": {
         "title": "Um welchen Zähler handelt es sich?",
-        "description": "Der Zähler hat geantwortet, meldet aber den Gerätecode {meter_code}, den diese Integration nicht kennt. Wähle das Modell, damit die richtige Registerbelegung verwendet wird.",
+        "description": "Dieser Zähler meldet keinen Modellcode, was bei SDM120CT und SDM230 normal ist. Wähle das Modell, damit die richtige Registerbelegung verwendet wird.",
+        "data": {
+          "model": "Modell"
+        }
+      },
+      "model_unknown_code": {
+        "title": "Um welchen Zähler handelt es sich?",
+        "description": "Der Zähler meldet den Modellcode {meter_code}, den diese Integration nicht kennt. Wähle das Modell, damit die richtige Registerbelegung verwendet wird.",
         "data": {
           "model": "Modell"
         }

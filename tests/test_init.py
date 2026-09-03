@@ -135,3 +135,26 @@ async def test_sdm630_sets_up_with_its_own_register_map(
     assert hass.states.get("sensor.sdm120_1_total_system_power") is not None
     # A single-phase field the SDM630 does not declare must not appear.
     assert hass.states.get("sensor.sdm120_1_voltage") is None
+
+
+async def test_sdm120ct_reporting_the_sdm120_code_is_not_a_mismatch(
+    hass: HomeAssistant, config_entry: MockConfigEntry, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A CT variant is an SDM120 in firmware and shares its register map.
+
+    Warning here would ask the user to fix a configuration that is correct and
+    that would read identically either way.
+    """
+    config_entry.add_to_hass(hass)
+    hass.config_entries.async_update_entry(
+        config_entry, data={**config_entry.data, CONF_MODEL: SdmModel.SDM120CT}
+    )
+    with patch(
+        "custom_components.eastron_sdm.async_get_unit",
+        return_value=build_unit(meter_code=0x0020),
+    ):
+        await hass.config_entries.async_setup(config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    assert config_entry.state is ConfigEntryState.LOADED
+    assert "reports meter code" not in caplog.text

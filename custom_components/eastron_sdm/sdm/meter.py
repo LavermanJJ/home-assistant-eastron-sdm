@@ -31,7 +31,7 @@ MEASUREMENTS: dict[SdmModel, type[Component]] = {
     SdmModel.SDM230: Sdm230Measurements,
     SdmModel.SDM630: Sdm630Measurements,
     SdmModel.SDM630MCT: Sdm630MctMeasurements,
-    SdmModel.SDM72D: Sdm72dMeasurements,
+    SdmModel.SDM72D_M_1: Sdm72dMeasurements,
     SdmModel.SDM72DM_V2: Sdm72dmV2Measurements,
 }
 

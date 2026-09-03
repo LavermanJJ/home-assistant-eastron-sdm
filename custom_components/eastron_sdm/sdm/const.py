@@ -20,7 +20,11 @@ class SdmModel(StrEnum):
     SDM230 = "SDM230"
     SDM630 = "SDM630"
     SDM630MCT = "SDM630MCT"
-    SDM72D = "SDM72D"
+    # Both of these are sold as "SDM72D" and they are not interchangeable, so
+    # neither gets the bare family name: on the model-selection step the value
+    # is the label, and "SDM72D" next to "SDM72DM-V2" invites a V2 owner to
+    # pick the energy-only map and lose voltage, current and power factor.
+    SDM72D_M_1 = "SDM72D-M-1"
     SDM72DM_V2 = "SDM72DM-V2"
 
 
@@ -43,7 +47,7 @@ METER_CODES: dict[int, SdmModel] = {
     0x0020: SdmModel.SDM120,
     0x0070: SdmModel.SDM630,
     0x0079: SdmModel.SDM630MCT,
-    0x0084: SdmModel.SDM72D,
+    0x0084: SdmModel.SDM72D_M_1,
     0x0089: SdmModel.SDM72DM_V2,
 }
 

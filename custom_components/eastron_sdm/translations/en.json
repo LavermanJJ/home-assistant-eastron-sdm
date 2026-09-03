@@ -39,7 +39,14 @@
       },
       "model": {
         "title": "Which meter is this?",
-        "description": "The meter answered but reported meter code {meter_code}, which this integration does not recognise. Choose the model so the right register map is used.",
+        "description": "This meter does not report a model code, which is normal for the SDM120CT and SDM230. Choose the model so the right register map is used.",
+        "data": {
+          "model": "Model"
+        }
+      },
+      "model_unknown_code": {
+        "title": "Which meter is this?",
+        "description": "The meter reported model code {meter_code}, which this integration does not recognise. Choose the model so the right register map is used.",
         "data": {
           "model": "Model"
         }

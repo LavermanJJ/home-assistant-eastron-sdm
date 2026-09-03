@@ -24,8 +24,16 @@ class Sdm72dMeasurements(Component):
 
     register_space = "input"
     max_span = 60
+    # Tight around the documented fields. A single (0x000C, 0x0035) range
+    # would let the planner merge the phase powers and the system total into
+    # one 42-register read spanning 0x0012-0x0033 -- addresses this meter's
+    # manual does not list. If it answered any of them with an illegal-data-
+    # address exception, the whole poll would fail and all twelve entities
+    # would go unavailable, including the ones that read fine. One extra
+    # two-register read is the cheaper side of that trade.
     register_ranges = (
-        (0x000C, 0x0035),
+        (0x000C, 0x0011),
+        (0x0034, 0x0035),
         (0x0048, 0x004B),
         (0x0156, 0x0157),
         (0x0180, 0x0187),

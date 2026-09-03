@@ -12,7 +12,7 @@ from homeassistant.exceptions import ConfigEntryError, HomeAssistantError
 from .connection import build_params
 from .const import CONF_UNIT_ID, DOMAIN
 from .coordinator import SdmConfigEntry, SdmCoordinator
-from .sdm import METER_CODES, SdmMeter, SdmModel
+from .sdm import MEASUREMENTS, METER_CODES, SdmMeter, SdmModel
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -52,7 +52,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: SdmConfigEntry) -> bool:
 
     if (code := meter.info.meter_code) is not None:
         detected = METER_CODES.get(code)
-        if detected is not None and detected is not model:
+        # Compared by register map, not by model name. An SDM120CT is an
+        # SDM120 in firmware and shares its map, so a CT reporting 0x0020 is
+        # correctly configured -- warning there would ask the user to fix
+        # something that is right and would read identically either way.
+        if detected is not None and MEASUREMENTS[detected] is not MEASUREMENTS[model]:
             _LOGGER.warning(
                 "%s is configured as %s but reports meter code 0x%04X (%s). "
                 "Reconfigure the entry if the wrong model was chosen",
