@@ -110,6 +110,18 @@ most significant register first, read with function code 04. Requests must use
 an even start address and an even register count, and may not exceed 80
 registers; the tests assert all three.
 
+## Branding
+
+The Eastron mark in `custom_components/eastron_sdm/brand/` is served by Home
+Assistant's local brand API, which resolves images by integration **domain**.
+The brands repository does carry an `eastron` entry, but that belongs to the
+core virtual integration of that name (which redirects to HomeWizard), and
+`eastron_sdm` is a different domain -- so the assets have to travel with this
+repository. Since Home Assistant 2026.3 that is the supported way for a custom
+integration to brand itself, and local images take priority over the CDN.
+
+This integration is not affiliated with or endorsed by Eastron.
+
 ## Architecture
 
 ```
