@@ -84,9 +84,6 @@
     "bus_settings_conflict": {
       "message": "Cannot open the bus: {error}"
     },
-    "cannot_connect": {
-      "message": "The meter did not answer: {error}"
-    },
     "poll_failed": {
       "message": "Error reading the meter: {error}"
     }

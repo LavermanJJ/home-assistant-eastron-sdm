@@ -78,18 +78,6 @@ async def test_conflicting_line_settings_fail_the_entry(
     assert config_entry.state is ConfigEntryState.SETUP_ERROR
 
 
-async def test_options_change_reloads(
-    hass: HomeAssistant, setup_integration: MockConfigEntry
-) -> None:
-    """Changing the scan interval takes effect without a restart."""
-    entry = setup_integration
-    hass.config_entries.async_update_entry(entry, options={"scan_interval": 60})
-    await hass.async_block_till_done()
-
-    assert entry.state is ConfigEntryState.LOADED
-    assert entry.runtime_data.update_interval.total_seconds() == 60
-
-
 async def test_wrong_model_is_flagged_not_silently_wrong(
     hass: HomeAssistant,
     config_entry: MockConfigEntry,

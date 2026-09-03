@@ -8,10 +8,12 @@ from typing import Any
 
 from homeassistant.components.modbus import async_get_temporary_unit
 from homeassistant.config_entries import (
+    SOURCE_RECONFIGURE,
     ConfigEntry,
+    ConfigEntryState,
     ConfigFlow,
     ConfigFlowResult,
-    OptionsFlow,
+    OptionsFlowWithReload,
 )
 from homeassistant.const import (
     CONF_DEVICE,
@@ -112,7 +114,7 @@ class SdmConfigFlow(ConfigFlow, domain=DOMAIN):
         """Configure a meter on an RS485 serial port."""
         errors: dict[str, str] = {}
         if user_input is not None:
-            data = {CONF_CONNECTION_TYPE: CONNECTION_SERIAL, **_coerce(user_input)}
+            data = self._merge(CONNECTION_SERIAL, user_input)
             errors = await self._async_try(data)
             if not errors:
                 return await self._async_finish()
@@ -120,7 +122,8 @@ class SdmConfigFlow(ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id=CONNECTION_SERIAL,
             data_schema=self.add_suggested_values_to_schema(
-                await self._async_serial_schema(), self._suggestions(CONNECTION_SERIAL)
+                await self._async_serial_schema(),
+                self._suggestions(CONNECTION_SERIAL, user_input),
             ),
             errors=errors,
         )
@@ -131,7 +134,7 @@ class SdmConfigFlow(ConfigFlow, domain=DOMAIN):
         """Configure a meter reached over TCP, directly or through a gateway."""
         errors: dict[str, str] = {}
         if user_input is not None:
-            data = {CONF_CONNECTION_TYPE: CONNECTION_TCP, **_coerce(user_input)}
+            data = self._merge(CONNECTION_TCP, user_input)
             errors = await self._async_try(data)
             if not errors:
                 return await self._async_finish()
@@ -139,7 +142,7 @@ class SdmConfigFlow(ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id=CONNECTION_TCP,
             data_schema=self.add_suggested_values_to_schema(
-                _TCP_SCHEMA, self._suggestions(CONNECTION_TCP)
+                _TCP_SCHEMA, self._suggestions(CONNECTION_TCP, user_input)
             ),
             errors=errors,
         )
@@ -186,26 +189,59 @@ class SdmConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         """Change an existing meter's link settings or unit ID."""
         entry = self._get_reconfigure_entry()
-        self._data = dict(entry.data)
+        if not self._data:
+            self._data = dict(entry.data)
         if entry.data[CONF_CONNECTION_TYPE] == CONNECTION_SERIAL:
             return await self.async_step_serial(user_input)
         return await self.async_step_tcp(user_input)
 
     # -- helpers --------------------------------------------------------------
 
-    def _suggestions(self, connection_type: str) -> dict[str, Any]:
-        """Prefill from this flow, or from a meter already on the same bus.
+    def _merge(
+        self, connection_type: str, user_input: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        """Fold this form's answers into what the flow already knows.
 
-        Adding the second through sixth meter on one converter should be a
-        matter of changing the unit ID, so the last entry configured the same
-        way supplies every other field.
+        The form only carries link settings, so a reconfigure would otherwise
+        drop everything not on it -- the model above all, without which the
+        entry cannot be set up again at all.
         """
-        if self._data:
-            return self._data
-        for entry in reversed(self._async_current_entries()):
-            if entry.data.get(CONF_CONNECTION_TYPE) == connection_type:
-                return {k: v for k, v in entry.data.items() if k != CONF_UNIT_ID}
-        return {}
+        return {
+            **self._data,
+            CONF_CONNECTION_TYPE: connection_type,
+            **_coerce(user_input),
+        }
+
+    def _suggestions(
+        self, connection_type: str, user_input: Mapping[str, Any] | None = None
+    ) -> dict[str, Any]:
+        """Prefill the form, most specific source first.
+
+        After a failed probe that is what the user just typed, so a wrong baud
+        rate does not cost them the device path as well. Otherwise it is this
+        flow's own data (a reconfigure, or the entry being edited), and failing
+        that the last meter configured the same way -- which is what makes
+        adding the second through sixth meter on one converter a matter of
+        changing the unit ID.
+        """
+        source: dict[str, Any]
+        if user_input is not None:
+            source = dict(user_input)
+        elif self._data:
+            source = dict(self._data)
+        else:
+            source = {}
+            for entry in reversed(self._async_current_entries()):
+                if entry.data.get(CONF_CONNECTION_TYPE) == connection_type:
+                    source = {k: v for k, v in entry.data.items() if k != CONF_UNIT_ID}
+                    break
+
+        # The dropdowns are string-valued, so an int suggestion matches no
+        # option and the field renders unset.
+        return {
+            key: str(value) if key in _SELECT_INTEGERS else value
+            for key, value in source.items()
+        }
 
     async def _async_port_options(self) -> list[SelectOptionDict]:
         """List the serial ports present, best effort.
@@ -250,11 +286,13 @@ class SdmConfigFlow(ConfigFlow, domain=DOMAIN):
         return vol.Schema(
             {
                 vol.Required(CONF_DEVICE): device_selector,
-                vol.Required(CONF_BAUDRATE, default=DEFAULT_BAUDRATE): _options(
+                # The defaults are strings to match the selector's options;
+                # `_coerce` turns them back into integers for the entry.
+                vol.Required(CONF_BAUDRATE, default=str(DEFAULT_BAUDRATE)): _options(
                     BAUD_RATES
                 ),
                 vol.Required(CONF_PARITY, default=DEFAULT_PARITY): _options(PARITIES),
-                vol.Required(CONF_STOPBITS, default=DEFAULT_STOPBITS): _options(
+                vol.Required(CONF_STOPBITS, default=str(DEFAULT_STOPBITS)): _options(
                     STOPBITS
                 ),
                 vol.Required(CONF_UNIT_ID, default=DEFAULT_UNIT_ID): _UNIT_ID,
@@ -269,6 +307,7 @@ class SdmConfigFlow(ConfigFlow, domain=DOMAIN):
             return {"base": "invalid_link"}
 
         unit_id = int(data[CONF_UNIT_ID])
+        await self._async_release_own_connection()
         try:
             probe = await self._async_identify(params, unit_id)
         except HomeAssistantError as err:
@@ -276,16 +315,40 @@ class SdmConfigFlow(ConfigFlow, domain=DOMAIN):
             # meter on one bus must agree on baud rate and parity, so this is
             # a wiring truth, not a Home Assistant limitation.
             _LOGGER.debug("Bus settings conflict on %s: %s", describe(params), err)
-            return {"base": "bus_settings_conflict"}
+            return self._async_failed({"base": "bus_settings_conflict"})
         except (ModbusTimeoutError, ModbusConnectionError):
-            return {"base": "cannot_connect"}
+            return self._async_failed({"base": "cannot_connect"})
         except ModbusError as err:
             _LOGGER.debug("Unexpected Modbus error probing %s: %s", unit_id, err)
-            return {"base": "cannot_connect"}
+            return self._async_failed({"base": "cannot_connect"})
 
         self._data = data
         self._probe = probe
         return {}
+
+    async def _async_release_own_connection(self) -> None:
+        """Unload the entry being reconfigured before probing it.
+
+        Its own connection is still open on this port with the old line
+        settings, and the shared connection manager refuses a second set of
+        settings on one endpoint. Without letting go first, changing a baud
+        rate -- the thing this step exists for -- could only ever report a
+        conflict with itself.
+        """
+        if self.source != SOURCE_RECONFIGURE:
+            return
+        entry = self._get_reconfigure_entry()
+        if entry.state is ConfigEntryState.LOADED:
+            await self.hass.config_entries.async_unload(entry.entry_id)
+
+    @callback
+    def _async_failed(self, errors: dict[str, str]) -> dict[str, str]:
+        """Put a reconfigured entry back the way it was after a failed probe."""
+        if self.source == SOURCE_RECONFIGURE:
+            self.hass.config_entries.async_schedule_reload(
+                self._get_reconfigure_entry().entry_id
+            )
+        return errors
 
     async def _async_identify(self, params: SdmParams, unit_id: int) -> SdmProbe:
         """Read the meter's identity, tolerating a missing device-info block."""
@@ -310,21 +373,31 @@ class SdmConfigFlow(ConfigFlow, domain=DOMAIN):
         assert self._probe is not None
         params = build_params(self._data)
         unit_id = int(self._data[CONF_UNIT_ID])
+        serial_number = self._probe.serial_number
+
+        if self.source == SOURCE_RECONFIGURE:
+            entry = self._get_reconfigure_entry()
+            if serial_number is not None:
+                # A serial number identifies the meter itself, so it is worth
+                # refusing an entry that has been pointed at a different one:
+                # its history would silently continue under the wrong meter.
+                await self.async_set_unique_id(str(serial_number))
+                self._abort_if_unique_id_mismatch(reason="different_meter")
+            # A meter with no serial number is only identified by where it sits
+            # on the bus, which is exactly what this step changes -- so there is
+            # nothing here to compare, and the entry keeps the ID it has.
+            return self.async_update_reload_and_abort(
+                entry, data=self._data, title=self._title()
+            )
 
         # A serial number identifies the meter wherever it is moved to. Without
         # one, its position on the bus is the next best thing -- stable as long
         # as the meter stays where it is wired.
-        if self._probe.serial_number is not None:
-            unique_id = f"{self._probe.serial_number}"
+        if serial_number is not None:
+            unique_id = str(serial_number)
         else:
             unique_id = f"{'-'.join(str(p) for p in params.endpoint)}-{unit_id}"
-
         await self.async_set_unique_id(unique_id)
-        if self.source == "reconfigure":
-            entry = self._get_reconfigure_entry()
-            self._abort_if_unique_id_mismatch(reason="different_meter")
-            return self.async_update_reload_and_abort(entry, data=self._data)
-
         self._abort_if_unique_id_configured()
 
         if self._probe.model is None:
@@ -332,15 +405,21 @@ class SdmConfigFlow(ConfigFlow, domain=DOMAIN):
         self._data[CONF_MODEL] = self._probe.model
         return self._async_create()
 
+    def _title(self) -> str:
+        """Name the entry for its model and its place on the bus."""
+        return f"{self._data[CONF_MODEL]} ({int(self._data[CONF_UNIT_ID])})"
+
     def _async_create(self) -> ConfigFlowResult:
         """Create the entry."""
-        model = self._data[CONF_MODEL]
-        unit_id = int(self._data[CONF_UNIT_ID])
-        return self.async_create_entry(title=f"{model} ({unit_id})", data=self._data)
+        return self.async_create_entry(title=self._title(), data=self._data)
 
 
-class SdmOptionsFlow(OptionsFlow):
-    """Adjust how often a meter is polled."""
+class SdmOptionsFlow(OptionsFlowWithReload):
+    """Adjust how often a meter is polled.
+
+    ``OptionsFlowWithReload`` reloads the entry when the options change, so the
+    integration does not register an update listener of its own.
+    """
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -395,6 +474,10 @@ _TCP_SCHEMA = vol.Schema(
 #: entry as integers, so that two entries built from the same form always
 #: produce identical connection parameters and therefore share a connection.
 _INTEGERS = (CONF_BAUDRATE, CONF_STOPBITS, CONF_UNIT_ID, CONF_PORT)
+
+#: Of those, the ones backed by a string-valued dropdown, whose suggestions
+#: have to be stringified again on the way back into the form.
+_SELECT_INTEGERS = (CONF_BAUDRATE, CONF_STOPBITS)
 
 
 def _coerce(user_input: Mapping[str, Any]) -> dict[str, Any]:

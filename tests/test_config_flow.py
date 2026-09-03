@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager, contextmanager
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from homeassistant.config_entries import SOURCE_USER
+from homeassistant.config_entries import SOURCE_USER, ConfigEntryState
 from homeassistant.const import (
     CONF_DEVICE,
     CONF_HOST,
@@ -235,8 +235,11 @@ async def test_second_meter_on_the_bus_is_prefilled(
         if key.description and "suggested_value" in key.description
     }
     assert suggested[CONF_DEVICE] == SERIAL_DATA[CONF_DEVICE]
-    assert suggested[CONF_BAUDRATE] == SERIAL_DATA[CONF_BAUDRATE]
     assert suggested[CONF_PARITY] == SERIAL_DATA[CONF_PARITY]
+    # Stringified to match the dropdown's option values, which are strings; an
+    # int would match no option and the field would render unset.
+    assert suggested[CONF_BAUDRATE] == str(SERIAL_DATA[CONF_BAUDRATE])
+    assert suggested[CONF_STOPBITS] == str(SERIAL_DATA[CONF_STOPBITS])
     # The one field that must differ between meters is not carried over.
     assert CONF_UNIT_ID not in suggested
 
@@ -272,9 +275,20 @@ async def test_reconfigure_keeps_the_entry(
             result["flow_id"], {**SERIAL_INPUT, CONF_UNIT_ID: 4}
         )
 
+        await hass.async_block_till_done()
+
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "reconfigure_successful"
     assert config_entry.data[CONF_UNIT_ID] == 4
+    # The form carries only link settings; everything else has to survive, or
+    # the entry cannot be set up again.
+    assert config_entry.data[CONF_MODEL] == SdmModel.SDM120
+    assert config_entry.state is ConfigEntryState.LOADED
+    # The title names the meter's place on the bus, so moving it renames it.
+    assert config_entry.title == "SDM120 (4)"
+
+    await hass.config_entries.async_unload(config_entry.entry_id)
+    await hass.async_block_till_done()
 
 
 async def test_reconfigure_rejects_a_different_meter(
@@ -354,3 +368,167 @@ async def test_setup_still_possible_without_pyserial(hass: HomeAssistant) -> Non
 
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == CONNECTION_SERIAL
+
+
+async def test_reconfigure_meter_without_serial_number(
+    hass: HomeAssistant, config_entry: MockConfigEntry
+) -> None:
+    """A meter with no serial number must still be movable on the bus.
+
+    Its unique ID is derived from where it sits, which is the very thing a
+    reconfigure changes -- so comparing IDs would read every move as a swap
+    for a different meter.
+    """
+    config_entry.add_to_hass(hass)
+    hass.config_entries.async_update_entry(
+        config_entry, unique_id="serial-/dev/ttyUSB0-1"
+    )
+    unit = build_unit(SdmModel.SDM630)
+    unit.fail_read(0xFC00, IllegalDataAddressError(), register_type="holding")
+
+    result = await config_entry.start_reconfigure_flow(hass)
+    with serving(unit):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {**SERIAL_INPUT, CONF_UNIT_ID: 4}
+        )
+        await hass.async_block_till_done()
+
+    assert result["reason"] == "reconfigure_successful"
+    assert config_entry.data[CONF_UNIT_ID] == 4
+
+    await hass.config_entries.async_unload(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+
+async def test_select_defaults_match_option_type(hass: HomeAssistant) -> None:
+    """Dropdown defaults must be the same type as the dropdown's options.
+
+    The selector validates against string options, so an int default matches
+    nothing: the field renders unset, and voluptuous raises if the key is ever
+    filled from the default rather than from the form.
+    """
+    flow_id = await _start_serial(hass)
+    with serving():
+        result = await hass.config_entries.flow.async_configure(flow_id, None)
+
+    for key in result["data_schema"].schema:
+        if key.schema in (CONF_BAUDRATE, CONF_STOPBITS):
+            assert isinstance(key.default(), str), (
+                f"{key.schema} default is {key.default()!r}, "
+                "but the selector's options are strings"
+            )
+
+
+async def test_reconfigure_can_change_line_settings(
+    hass: HomeAssistant, config_entry: MockConfigEntry
+) -> None:
+    """Changing a baud rate must not be blocked by the entry's own connection.
+
+    The shared connection manager refuses a second set of line settings on one
+    endpoint, and the entry being reconfigured is still holding that endpoint
+    with the old ones. The stand-in below enforces exactly that rule, so this
+    fails unless the flow lets go of its own connection before probing.
+    """
+    config_entry.add_to_hass(hass)
+    with serving(build_unit()):
+        await hass.config_entries.async_setup(config_entry.entry_id)
+        await hass.async_block_till_done()
+    assert config_entry.state is ConfigEntryState.LOADED
+
+    @asynccontextmanager
+    async def _one_set_of_line_settings_per_port(hass_, params, unit_id):
+        if config_entry.state is ConfigEntryState.LOADED:
+            raise HomeAssistantError(
+                f"Modbus device {params.endpoint} is already in use with "
+                "different link settings"
+            )
+        yield build_unit()
+
+    result = await config_entry.start_reconfigure_flow(hass)
+    with (
+        patch(
+            "custom_components.eastron_sdm.config_flow.async_get_temporary_unit",
+            _one_set_of_line_settings_per_port,
+        ),
+        patch(
+            "custom_components.eastron_sdm.async_get_unit", return_value=build_unit()
+        ),
+        patch("serial.tools.list_ports.comports", return_value=[]),
+    ):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {**SERIAL_INPUT, CONF_BAUDRATE: "19200"}
+        )
+        await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+    assert config_entry.data[CONF_BAUDRATE] == 19200
+
+    await hass.config_entries.async_unload(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+
+async def test_failed_reconfigure_puts_the_entry_back(
+    hass: HomeAssistant, config_entry: MockConfigEntry
+) -> None:
+    """Abandoning a reconfigure must not leave the meter unloaded.
+
+    The flow unloads the entry to free the port before probing, so a probe
+    that fails has to restore it rather than leave the user's meter dark.
+    """
+    config_entry.add_to_hass(hass)
+    with serving(build_unit()):
+        await hass.config_entries.async_setup(config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    silent = build_unit()
+    silent.fail_requests(ModbusTimeoutError())
+
+    @asynccontextmanager
+    async def _no_answer(*args, **kwargs):
+        yield silent
+
+    result = await config_entry.start_reconfigure_flow(hass)
+    with (
+        patch(
+            "custom_components.eastron_sdm.config_flow.async_get_temporary_unit",
+            _no_answer,
+        ),
+        # The entry's old settings still work; it is the settings being probed
+        # that do not, so the restoring reload has to find a live meter.
+        patch(
+            "custom_components.eastron_sdm.async_get_unit", return_value=build_unit()
+        ),
+        patch("serial.tools.list_ports.comports", return_value=[]),
+    ):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], SERIAL_INPUT
+        )
+        await hass.async_block_till_done()
+
+    assert result["errors"] == {"base": "cannot_connect"}
+    assert config_entry.state is ConfigEntryState.LOADED
+
+    await hass.config_entries.async_unload(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+
+async def test_a_failed_probe_keeps_what_was_typed(hass: HomeAssistant) -> None:
+    """A wrong baud rate must not also cost the user the port they typed."""
+    unit = build_unit()
+    unit.fail_requests(ModbusTimeoutError())
+
+    flow_id = await _start_serial(hass)
+    with serving(unit):
+        result = await hass.config_entries.flow.async_configure(
+            flow_id,
+            {**SERIAL_INPUT, CONF_DEVICE: "/dev/ttyUSB7", CONF_BAUDRATE: "2400"},
+        )
+
+    suggested = {
+        key.schema: key.description["suggested_value"]
+        for key in result["data_schema"].schema
+        if key.description and "suggested_value" in key.description
+    }
+    assert suggested[CONF_DEVICE] == "/dev/ttyUSB7"
+    assert suggested[CONF_BAUDRATE] == "2400"

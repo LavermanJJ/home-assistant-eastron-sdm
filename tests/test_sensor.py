@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from unittest.mock import patch
 
 from homeassistant.components.sensor import (
     ATTR_STATE_CLASS,
@@ -13,6 +14,7 @@ from homeassistant.const import (
     ATTR_DEVICE_CLASS,
     ATTR_UNIT_OF_MEASUREMENT,
     STATE_UNAVAILABLE,
+    STATE_UNKNOWN,
     UnitOfEnergy,
 )
 from homeassistant.core import HomeAssistant
@@ -27,6 +29,8 @@ from pytest_homeassistant_custom_component.common import (
 )
 
 from custom_components.eastron_sdm.sdm import MEASUREMENTS, SdmModel
+
+from .conftest import build_unit
 
 
 async def test_energy_sensors_can_drive_the_energy_dashboard(
@@ -107,3 +111,28 @@ async def test_every_model_field_becomes_a_sensor(
     described = {description.key for description in SENSORS}
     declared = set(MEASUREMENTS[model].declared_fields)
     assert declared <= described, declared - described
+
+
+async def test_diagnostics_exist_even_if_the_identity_read_failed(
+    hass: HomeAssistant, config_entry: MockConfigEntry
+) -> None:
+    """The entity set must not depend on a transient bus error at startup.
+
+    Identity is read once and is allowed to fail, so filtering the diagnostic
+    entities on their value would make them appear or not appear depending on
+    how busy the bus happened to be, and never come back until a reload.
+    """
+    unit = build_unit()
+    unit.fail_read(0x0012, ModbusTimeoutError(), register_type="holding")
+    unit.fail_read(0xFC00, ModbusTimeoutError(), register_type="holding")
+
+    config_entry.add_to_hass(hass)
+    with patch("custom_components.eastron_sdm.async_get_unit", return_value=unit):
+        await hass.config_entries.async_setup(config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    registry = er.async_get(hass)
+    assert registry.async_get("sensor.sdm120_1_node_address") is not None
+    assert hass.states.get("sensor.sdm120_1_node_address").state == STATE_UNKNOWN
+    # Measurements are unaffected: only the identity block went missing.
+    assert hass.states.get("sensor.sdm120_1_voltage").state == "1.0"

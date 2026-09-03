@@ -84,9 +84,6 @@
     "bus_settings_conflict": {
       "message": "Der Bus konnte nicht geöffnet werden: {error}"
     },
-    "cannot_connect": {
-      "message": "Der Zähler hat nicht geantwortet: {error}"
-    },
     "poll_failed": {
       "message": "Fehler beim Lesen des Zählers: {error}"
     }

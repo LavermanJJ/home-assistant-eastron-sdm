@@ -5,15 +5,9 @@ from __future__ import annotations
 import logging
 
 from homeassistant.components.modbus import async_get_unit
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_MODEL, Platform
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import (
-    ConfigEntryError,
-    ConfigEntryNotReady,
-    HomeAssistantError,
-)
-from modbus_connection import ModbusError
+from homeassistant.exceptions import ConfigEntryError, HomeAssistantError
 
 from .connection import build_params
 from .const import CONF_UNIT_ID, DOMAIN
@@ -52,14 +46,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: SdmConfigEntry) -> bool:
         ) from err
 
     meter = SdmMeter(unit, model)
-    try:
-        await meter.async_setup()
-    except ModbusError as err:
-        raise ConfigEntryNotReady(
-            translation_domain=DOMAIN,
-            translation_key="cannot_connect",
-            translation_placeholders={"error": str(err)},
-        ) from err
+    # Never raises: identity is optional, and a meter that does not answer is
+    # caught by the first coordinator refresh below.
+    await meter.async_setup()
 
     if (code := meter.info.meter_code) is not None:
         detected = METER_CODES.get(code)
@@ -77,7 +66,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: SdmConfigEntry) -> bool:
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
 
-    entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 
@@ -90,8 +78,3 @@ async def async_unload_entry(hass: HomeAssistant, entry: SdmConfigEntry) -> bool
     meter on that port has gone.
     """
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-
-
-async def _async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Reload when options change, to pick up a new scan interval."""
-    await hass.config_entries.async_reload(entry.entry_id)

@@ -329,10 +329,12 @@ async def async_setup_entry(
         for description in SENSORS
         if description.key in declared
     ]
+    # Created unconditionally. The identity read is allowed to fail -- a busy
+    # bus at startup is not a reason to refuse setup -- and filtering on the
+    # value here would make the entity set depend on whether that happened to
+    # succeed, leaving entities permanently absent until the entry reloads.
     entities.extend(
-        SdmDiagnosticSensor(coordinator, description)
-        for description in DIAGNOSTICS
-        if description.value_fn(coordinator.meter.info) is not None
+        SdmDiagnosticSensor(coordinator, description) for description in DIAGNOSTICS
     )
     async_add_entities(entities)
 
