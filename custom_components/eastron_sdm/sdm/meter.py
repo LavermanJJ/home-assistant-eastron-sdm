@@ -10,17 +10,29 @@ from modbus_connection.model import Component
 
 from .const import BAUD_RATES, METER_CODES, PARITY_STOP, SdmModel
 from .identity import SdmDeviceInfo, SdmNetworkSettings
+from .sdm72d import Sdm72dMeasurements, Sdm72dmV2Measurements
 from .sdm120 import Sdm120Measurements
+from .sdm230 import Sdm230Measurements
 from .sdm630 import Sdm630Measurements
+from .sdm630mct import Sdm630MctMeasurements
 
 if TYPE_CHECKING:
     from modbus_connection import ModbusUnit
 
-#: The measurement component for each model. Adding SDM220/SDM230/SDM72 is a
-#: new module plus one line here.
+#: The measurement component for each model. Adding another is a new module
+#: plus one line here, and its meter code in ``const.METER_CODES``.
+#:
+#: The SDM120CT map is identical to the SDM120's -- the CT variant changes how
+#: current is sensed, not which registers report it -- so it shares the
+#: component while keeping its own model name for the device page.
 MEASUREMENTS: dict[SdmModel, type[Component]] = {
     SdmModel.SDM120: Sdm120Measurements,
+    SdmModel.SDM120CT: Sdm120Measurements,
+    SdmModel.SDM230: Sdm230Measurements,
     SdmModel.SDM630: Sdm630Measurements,
+    SdmModel.SDM630MCT: Sdm630MctMeasurements,
+    SdmModel.SDM72D_M_1: Sdm72dMeasurements,
+    SdmModel.SDM72DM_V2: Sdm72dmV2Measurements,
 }
 
 

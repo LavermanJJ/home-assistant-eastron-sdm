@@ -3,8 +3,26 @@
 A Home Assistant integration for Eastron SDM energy meters over Modbus, built on
 Home Assistant's shared Modbus connection manager.
 
-Supports **SDM120** and **SDM630**, over an RS485 serial port or over TCP
-(a serial gateway such as ser2net, or a meter that speaks Modbus TCP natively).
+Works over an RS485 serial port or over TCP (a serial gateway such as ser2net,
+or a meter that speaks Modbus TCP natively).
+
+| Model | Phases | Entities | Per-request limit | Auto-detected |
+|---|---|---|---|---|
+| SDM120 | 1 | 21 | 80 registers | yes (`0x0020`) |
+| SDM120CT | 1 | 21 | 80 registers | no — pick the model |
+| SDM230 | 1 | 22 | 80 registers | no — pick the model |
+| SDM630 | 3 | 85 | 80 registers | yes (`0x0070`, unofficial) |
+| SDM630MCT | 3 | 93 | 60 registers | yes (`0x0079`) |
+| SDM72D-M-1 | 3 | 12 | 60 registers | yes (`0x0084`) |
+| SDM72DM-V2 | 3 | 41 | 60 registers | yes (`0x0089`) |
+
+Meters whose manual documents no meter code, or whose code this integration
+does not recognise, are not a failure case: setup asks which model it is.
+
+The two meters sold as SDM72D are **not interchangeable** — the -M-1 is an
+energy meter with no voltage or current registers at all, while the V2
+measures the full three-phase set. They report different meter codes, so
+detection tells them apart.
 
 ## Why one device per meter
 
@@ -75,7 +93,7 @@ default), or import − export. Import and export are unambiguous; prefer them.
 
 ## Entities
 
-Both models expose their full documented register map. Common measurements —
+Every model exposes its full documented register map. Common measurements —
 voltages, currents, powers, power factor, frequency and the import/export/total
 energy counters — are enabled by default. Harmonics, demand figures, phase
 angles and per-phase energy are registered but disabled, so they are one click
@@ -143,10 +161,14 @@ maps are declarative: an address, a type, a unit.
 ## Adding a model
 
 1. Add a module under `sdm/` with a `Component` subclass declaring the model's
-   input registers, transcribed from its protocol document.
+   input registers, transcribed from its protocol document, and set `max_span`
+   to that document's per-request limit. If the map is another model's plus a
+   few registers, subclass that model's component and declare only the
+   difference — as `sdm230.py` and `sdm630mct.py` do.
 2. Add the model to `SdmModel` and to `MEASUREMENTS` in `sdm/meter.py`, and its
    meter code to `METER_CODES` in `sdm/const.py`.
 3. Add any new field names to `SENSORS` in `sensor.py` and to `strings.json`.
+4. Record the document and its version in `docs/README.md`.
 
 `test_every_model_field_becomes_a_sensor` fails if step 3 is forgotten.
 

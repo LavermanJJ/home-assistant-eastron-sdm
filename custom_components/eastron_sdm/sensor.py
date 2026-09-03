@@ -31,6 +31,7 @@ from .entity import SdmEntity
 from .sdm import SdmInfo
 
 MEASUREMENT = SensorStateClass.MEASUREMENT
+TOTAL = SensorStateClass.TOTAL
 TOTAL_INCREASING = SensorStateClass.TOTAL_INCREASING
 
 
@@ -264,12 +265,39 @@ SENSORS: tuple[SdmSensorEntityDescription, ...] = (
     _power("maximum_export_system_power_demand", enabled=False),
     _apparent_power("total_system_apparent_power_demand", enabled=False),
     _apparent_power("maximum_total_system_apparent_power_demand", enabled=False),
+    _reactive_power("total_system_reactive_power_demand", enabled=False),
+    _reactive_power("maximum_total_system_reactive_power_demand", enabled=False),
     _current("current_demand", enabled=False),
     _current("maximum_current_demand", enabled=False),
     *(_current(f"current_demand_l{n}", enabled=False) for n in (1, 2, 3)),
     *(_current(f"maximum_current_demand_l{n}", enabled=False) for n in (1, 2, 3)),
     _current("neutral_current_demand", enabled=False),
     _current("maximum_neutral_current_demand", enabled=False),
+    # --- single-phase phase angle (SDM230) ---
+    _angle("phase_angle"),
+    # --- resettable counters (SDM72D, SDM630MCT) ---
+    # Zeroed from the meter's own menu, which TOTAL_INCREASING handles as the
+    # start of a new cycle rather than as negative usage -- the same reason
+    # the lifetime totals use it.
+    _energy("resettable_total_active_energy", enabled=False),
+    _energy("resettable_import_active_energy", enabled=False),
+    _energy("resettable_export_active_energy", enabled=False),
+    _reactive_energy("resettable_total_reactive_energy", enabled=False),
+    _reactive_energy("resettable_import_reactive_energy", enabled=False),
+    _reactive_energy("resettable_export_reactive_energy", enabled=False),
+    # Import minus export, so it falls whenever export runs ahead. TOTAL, not
+    # TOTAL_INCREASING, which would read every fall as a meter reset.
+    SdmSensorEntityDescription(
+        key="net_active_energy",
+        translation_key="net_active_energy",
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        state_class=TOTAL,
+        suggested_display_precision=3,
+    ),
+    # --- directional system power (SDM72D) ---
+    _power("total_import_active_power"),
+    _power("total_export_active_power"),
     # --- harmonics ---
     *(_thd(f"voltage_thd_l{n}") for n in (1, 2, 3)),
     *(_thd(f"current_thd_l{n}") for n in (1, 2, 3)),

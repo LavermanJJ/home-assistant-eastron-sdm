@@ -39,7 +39,14 @@
       },
       "model": {
         "title": "Which meter is this?",
-        "description": "The meter answered but reported meter code {meter_code}, which this integration does not recognise. Choose the model so the right register map is used.",
+        "description": "This meter does not report a model code, which is normal for the SDM120CT and SDM230. Choose the model so the right register map is used.",
+        "data": {
+          "model": "Model"
+        }
+      },
+      "model_unknown_code": {
+        "title": "Which meter is this?",
+        "description": "The meter reported model code {meter_code}, which this integration does not recognise. Choose the model so the right register map is used.",
         "data": {
           "model": "Model"
         }
@@ -132,6 +139,9 @@
       "average_voltage_thd_ln": {
         "name": "Average voltage THD L-N"
       },
+      "baud_rate": {
+        "name": "Baud rate"
+      },
       "current": {
         "name": "Current"
       },
@@ -222,6 +232,9 @@
       "import_system_power_demand": {
         "name": "Import system power demand"
       },
+      "line_settings": {
+        "name": "Line settings"
+      },
       "maximum_current_demand": {
         "name": "Maximum current demand"
       },
@@ -249,11 +262,23 @@
       "maximum_total_system_power_demand": {
         "name": "Maximum total system power demand"
       },
+      "maximum_total_system_reactive_power_demand": {
+        "name": "Maximum total system reactive power demand"
+      },
+      "net_active_energy": {
+        "name": "Net active energy"
+      },
       "neutral_current": {
         "name": "Neutral current"
       },
       "neutral_current_demand": {
         "name": "Neutral current demand"
+      },
+      "node_address": {
+        "name": "Node address"
+      },
+      "phase_angle": {
+        "name": "Phase angle"
       },
       "phase_angle_l1": {
         "name": "Phase angle L1"
@@ -288,6 +313,24 @@
       "reactive_power_l3": {
         "name": "Reactive power L3"
       },
+      "resettable_export_active_energy": {
+        "name": "Resettable export active energy"
+      },
+      "resettable_export_reactive_energy": {
+        "name": "Resettable export reactive energy"
+      },
+      "resettable_import_active_energy": {
+        "name": "Resettable import active energy"
+      },
+      "resettable_import_reactive_energy": {
+        "name": "Resettable import reactive energy"
+      },
+      "resettable_total_active_energy": {
+        "name": "Resettable total active energy"
+      },
+      "resettable_total_reactive_energy": {
+        "name": "Resettable total reactive energy"
+      },
       "sum_of_line_currents": {
         "name": "Sum of line currents"
       },
@@ -308,6 +351,12 @@
       },
       "total_apparent_energy": {
         "name": "Total apparent energy"
+      },
+      "total_export_active_power": {
+        "name": "Total export active power"
+      },
+      "total_import_active_power": {
+        "name": "Total import active power"
       },
       "total_reactive_energy": {
         "name": "Total reactive energy"
@@ -341,6 +390,9 @@
       },
       "total_system_reactive_power": {
         "name": "Total system reactive power"
+      },
+      "total_system_reactive_power_demand": {
+        "name": "Total system reactive power demand"
       },
       "voltage": {
         "name": "Voltage"
@@ -380,15 +432,6 @@
       },
       "voltage_thd_l3_l1": {
         "name": "Voltage THD L3-L1"
-      },
-      "node_address": {
-        "name": "Node address"
-      },
-      "baud_rate": {
-        "name": "Baud rate"
-      },
-      "line_settings": {
-        "name": "Line settings"
       }
     }
   }

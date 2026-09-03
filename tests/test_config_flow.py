@@ -140,7 +140,7 @@ async def test_unknown_meter_code_asks_for_the_model(hass: HomeAssistant) -> Non
         result = await hass.config_entries.flow.async_configure(flow_id, SERIAL_INPUT)
 
     assert result["type"] is FlowResultType.FORM
-    assert result["step_id"] == "model"
+    assert result["step_id"] == "model_unknown_code"
     assert result["description_placeholders"] == {"meter_code": "0x00FF"}
 
     result = await hass.config_entries.flow.async_configure(
@@ -532,3 +532,28 @@ async def test_a_failed_probe_keeps_what_was_typed(hass: HomeAssistant) -> None:
     }
     assert suggested[CONF_DEVICE] == "/dev/ttyUSB7"
     assert suggested[CONF_BAUDRATE] == "2400"
+
+
+async def test_meter_with_no_code_is_not_described_as_a_fault(
+    hass: HomeAssistant,
+) -> None:
+    """The SDM120CT and SDM230 document no meter code, so this is the norm.
+
+    Telling those users their meter "reported model code none, which this
+    integration does not recognise" would describe correct hardware as broken.
+    """
+    flow_id = await _start_serial(hass)
+    # The register is absent, so the meter answers it with zero -- which is
+    # not a code, and must not be quoted back as an unrecognised one.
+    with serving(build_unit(meter_code=None)):
+        result = await hass.config_entries.flow.async_configure(flow_id, SERIAL_INPUT)
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "model"
+    assert result["description_placeholders"] == {}
+
+    result = await hass.config_entries.flow.async_configure(
+        flow_id, {CONF_MODEL: SdmModel.SDM230}
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_MODEL] == SdmModel.SDM230

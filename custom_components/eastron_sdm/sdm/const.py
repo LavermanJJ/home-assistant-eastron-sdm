@@ -16,20 +16,39 @@ class SdmModel(StrEnum):
     """
 
     SDM120 = "SDM120"
+    SDM120CT = "SDM120CT"
+    SDM230 = "SDM230"
     SDM630 = "SDM630"
+    SDM630MCT = "SDM630MCT"
+    # Both of these are sold as "SDM72D" and they are not interchangeable, so
+    # neither gets the bare family name: on the model-selection step the value
+    # is the label, and "SDM72D" next to "SDM72DM-V2" invites a V2 owner to
+    # pick the energy-only map and lose voltage, current and power factor.
+    SDM72D_M_1 = "SDM72D-M-1"
+    SDM72DM_V2 = "SDM72DM-V2"
 
 
 #: Meter codes read from holding register ``0xFC02``, mapped to the model.
 #:
-#: ``0x0020`` for the SDM120 is documented in *SDM120-Modbus RTU Protocol*
-#: (holding register 464515, "Meter code = 00 20"). The SDM630 code is **not**
-#: in *SDM630 Modbus Protocol V1.8* — V2 hardware reports it, but the value
-#: below is drawn from field reports rather than the datasheet. Detection is
-#: therefore best-effort: an unrecognised code falls back to asking the user,
-#: it never blocks setup. See ``docs/README.md`` for both documents.
+#: Documented in the corresponding protocol manual, quoted verbatim:
+#:   0x0020  "Meter code = 00 20"      SDM120-Modbus RTU Protocol
+#:   0x0079  "Meter code = 00 79"      SDM630MCT Modbus Protocol V1.7
+#:   0x0084  "SDM72D-M-1= 00 84"       SDM72D-M-1 User Manual V1.4
+#:   0x0089  "SDM72D-M = 00 89"        SDM72DM-V2 User Manual V1.1
+#:
+#: The SDM630 code is **not** documented -- SDM630 Modbus Protocol V1.8 lists
+#: only the serial number at 0xFC00 -- and 0x0070 comes from field reports.
+#: The SDM120CT and SDM230 manuals document no meter code at all, so those two
+#: are never detected and always reach the model step.
+#:
+#: Detection is best-effort throughout: an unrecognised or missing code falls
+#: back to asking the user, it never blocks setup.
 METER_CODES: dict[int, SdmModel] = {
     0x0020: SdmModel.SDM120,
     0x0070: SdmModel.SDM630,
+    0x0079: SdmModel.SDM630MCT,
+    0x0084: SdmModel.SDM72D_M_1,
+    0x0089: SdmModel.SDM72DM_V2,
 }
 
 #: Values of the ``Network Parity Stop`` holding register (``0x0012``), which
@@ -43,9 +62,9 @@ PARITY_STOP: dict[int, tuple[str, int]] = {
 
 #: Values of the ``Network Baud Rate`` holding register (``0x001C``).
 #:
-#: Index 5 means 1200 baud on the SDM120 and is unused on the SDM630, which
-#: tops out at 38400. Reading it back is informational only; this integration
-#: never writes it.
+#: Index 5 means 1200 baud on the SDM120; the SDM72D range reaches 1200 too,
+#: while the SDM630 tops out at 38400. Reading it back is informational only;
+#: this integration never writes it.
 BAUD_RATES: dict[int, int] = {
     0: 2400,
     1: 4800,

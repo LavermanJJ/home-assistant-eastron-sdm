@@ -152,16 +152,29 @@ class SdmConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         """Ask which model this is, when the meter did not say.
 
-        Reached when a meter answers the bus but reports no meter code, or one
-        this integration does not recognise. That is not a failure: the
-        register maps are per model and the user knows which meter they wired.
+        Two situations reach here and they read very differently to a user, so
+        they get their own wording through their own step id. A meter that
+        reports no code at all is the documented, expected path for the
+        SDM120CT and SDM230, whose manuals define no meter code -- telling
+        those users their meter "reported model code none, which this
+        integration does not recognise" would describe correct hardware as a
+        fault. A meter that reports a code this integration does not know is
+        the genuinely unexpected one, and worth quoting the code back.
+
+        Neither is a failure: the register maps are per model and the user
+        knows which meter they wired.
         """
         if user_input is not None:
             self._data[CONF_MODEL] = user_input[CONF_MODEL]
             return self._async_create()
 
+        # A zero is not a code. A meter whose manual defines none may either
+        # refuse the register outright or answer it with zero, and both mean
+        # the same thing to the user; only the diagnostics dump keeps the raw
+        # value, where the distinction might matter to a bug report.
+        code = (self._probe.meter_code if self._probe is not None else None) or None
         return self.async_show_form(
-            step_id="model",
+            step_id="model" if code is None else "model_unknown_code",
             data_schema=vol.Schema(
                 {
                     vol.Required(CONF_MODEL): SelectSelector(
@@ -175,14 +188,20 @@ class SdmConfigFlow(ConfigFlow, domain=DOMAIN):
                     )
                 }
             ),
-            description_placeholders={
-                "meter_code": (
-                    f"0x{self._probe.meter_code:04X}"
-                    if self._probe is not None and self._probe.meter_code is not None
-                    else "none"
-                )
-            },
+            description_placeholders=(
+                {} if code is None else {"meter_code": f"0x{code:04X}"}
+            ),
         )
+
+    async def async_step_model_unknown_code(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Handle the model step for a meter that reported an unknown code.
+
+        Same question and same handling; it exists so that variant can carry
+        its own wording, which is keyed by step id.
+        """
+        return await self.async_step_model(user_input)
 
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
