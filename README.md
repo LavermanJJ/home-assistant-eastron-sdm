@@ -193,6 +193,12 @@ voltage, current, active power and total energy against the meter's own display
 before trusting the readings. A wrong word order or a one-register slip decodes
 to a plausible number rather than to an error.
 
+Measured against Home Assistant's [integration quality
+scale](https://developers.home-assistant.io/docs/core/integration-quality-scale/),
+this reaches platinum on the platinum rules themselves but not on the tiers
+below it: seven rules are still open, tracked with a reason each in
+[`custom_components/eastron_sdm/quality_scale.yaml`](custom_components/eastron_sdm/quality_scale.yaml).
+
 ## Licence
 
 Apache License 2.0. See [LICENSE](LICENSE).

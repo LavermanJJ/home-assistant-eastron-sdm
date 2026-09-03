@@ -1,0 +1,158 @@
+# The status of this integration against Home Assistant's integration quality
+# scale.
+#
+# The scale gates integrations in Home Assistant core and does not bind a
+# custom integration, so nothing validates this file here. It is kept because
+# its rule list is the clearest description of what is left to do, and a status
+# written down is one that can be argued with.
+#
+# Assessed against the checklist at
+# https://developers.home-assistant.io/docs/core/integration-quality-scale/checklist
+#
+# The manifest deliberately carries no `quality_scale` key: the tiers are
+# cumulative, and bronze is not met yet. Adding the key would claim a tier the
+# rules below say has not been reached.
+rules:
+  # Bronze
+  action-setup:
+    status: exempt
+    comment: |
+      This integration registers no service actions.
+  appropriate-polling: done
+  brands: done
+  common-modules: done
+  config-flow-test-coverage:
+    status: todo
+    comment: |
+      96%, not the 100% the rule asks for. Three paths are unreached: the TCP
+      branch of `async_step_reconfigure`, the `invalid_link` guard in
+      `_async_try`, and its catch-all `ModbusError` arm.
+  config-flow: done
+  dependency-transparency: done
+  docs-actions:
+    status: exempt
+    comment: |
+      This integration registers no service actions.
+  docs-conditions:
+    status: exempt
+    comment: |
+      This integration provides no conditions.
+  docs-high-level-description: done
+  docs-installation-instructions: done
+  docs-removal-instructions:
+    status: todo
+    comment: |
+      The README does not say how to remove the integration, or that deleting
+      the last entry on a port is what closes the shared connection.
+  docs-triggers:
+    status: exempt
+    comment: |
+      This integration provides no triggers.
+  entity-event-setup:
+    status: exempt
+    comment: |
+      Nothing pushes. Entities read the polled meter object through
+      `CoordinatorEntity`, and subscribe to no events of their own.
+  entity-unique-id: done
+  has-entity-name: done
+  runtime-data: done
+  test-before-configure: done
+  test-before-setup: done
+  unique-config-entry: done
+
+  # Silver
+  action-exceptions:
+    status: exempt
+    comment: |
+      This integration registers no service actions.
+  config-entry-unloading: done
+  docs-configuration-parameters: done
+  docs-installation-parameters: done
+  entity-unavailable: done
+  integration-owner: done
+  log-when-unavailable: done
+  parallel-updates:
+    status: todo
+    comment: |
+      `PARALLEL_UPDATES` is not declared in `sensor.py`. Nothing is actually
+      concurrent -- the platform is read-only and every request on a port is
+      serialized behind the shared connection's lock -- but the rule asks for
+      the declaration, and `0` is the honest value for a coordinator-driven
+      read-only platform.
+  reauthentication-flow:
+    status: exempt
+    comment: |
+      Modbus RTU and TCP carry no authentication, so there are no credentials
+      to renew.
+  test-coverage: done
+
+  # Gold
+  devices: done
+  diagnostics: done
+  discovery-update-info:
+    status: exempt
+    comment: |
+      Nothing is discovered, so there is no discovery information to follow.
+  discovery:
+    status: exempt
+    comment: |
+      A meter on an RS485 bus announces nothing. It answers at a unit ID the
+      user set on its own front panel, over a port only the user knows is
+      wired. Sweeping unit IDs would mean driving someone's bus uninvited.
+  docs-data-update: done
+  docs-examples:
+    status: todo
+    comment: |
+      The README shows no automation or template examples -- no low-voltage
+      alert, no per-phase imbalance check, no utility-meter helper on a
+      per-phase energy counter.
+  docs-known-limitations: done
+  docs-supported-devices: done
+  docs-supported-functions: done
+  docs-troubleshooting:
+    status: todo
+    comment: |
+      Diagnosis is spread across the config-flow error strings, the polling
+      section's note on `register_ranges`, and the bus-settings rule. It is
+      not gathered anywhere a user hunting a silent meter would look: no A/B
+      polarity, termination, unit-ID collision, or "port already open".
+  docs-use-cases: done
+  dynamic-devices:
+    status: exempt
+    comment: |
+      One config entry is one meter is one device. A meter appearing on the
+      bus is a new entry the user adds, not a device this one grows.
+  entity-category: done
+  entity-device-class: done
+  entity-disabled-by-default: done
+  entity-translations: done
+  exception-translations: done
+  icon-translations:
+    status: todo
+    comment: |
+      There is no `icons.json`. Sensors carrying a device class are fine, but
+      phase angle, the THD sensors, node address, baud rate and line settings
+      have none and fall back to the default icon.
+  reconfiguration-flow: done
+  repair-issues:
+    status: todo
+    comment: |
+      The model-mismatch case in `async_setup_entry` -- a meter reporting a
+      code whose register map is not the configured model's -- is a warning in
+      the log. It is exactly a repair issue: user action is needed, the entry
+      keeps running meanwhile, and the fix is one reconfigure away.
+  stale-devices:
+    status: exempt
+    comment: |
+      The device is removed with its config entry. A meter that stops
+      answering has gone quiet, not gone away, and deleting it would throw
+      away the history of a meter still on the wall.
+
+  # Platinum
+  async-dependency: done
+  inject-websession:
+    status: exempt
+    comment: |
+      Modbus over serial or a raw TCP socket. There is no HTTP session to
+      inject.
+  strict-typing: done
