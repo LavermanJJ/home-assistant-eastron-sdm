@@ -7,7 +7,7 @@
 <h3 align="center">Home Assistant Eastron SDM integration</h3>
 
 A Home Assistant integration for Eastron SDM energy meters over Modbus, built on
-Home Assistant's shared Modbus connection manager.
+Home Assistant's shared Modbus connection manager. It is not affiliated, associated, authorized, endorsed by, or in any way officially connected with the [Eastron Europe Limited](https://www.eastroneurope.com/about).
 
 Works over an RS485 serial port or over TCP (a serial gateway such as ser2net,
 or a meter that speaks Modbus TCP natively).
