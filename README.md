@@ -35,6 +35,9 @@ config entries                     shared connection
 **HACS** — add this repository as a custom repository of type *Integration*,
 install it, and restart Home Assistant.
 
+Requires **Home Assistant 2026.9.0 or newer**: the shared Modbus connection
+manager this is built on (`modbus.async_get_unit`) landed in that release.
+
 **Manual** — copy `custom_components/eastron_sdm` into your Home Assistant
 `config/custom_components/` directory and restart.
 

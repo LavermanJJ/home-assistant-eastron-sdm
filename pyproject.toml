@@ -3,20 +3,30 @@ name = "home-assistant-eastron-sdm"
 version = "0.1.0"
 description = "Home Assistant integration for Eastron SDM energy meters over Modbus"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.14"
 license = { text = "MIT" }
 
 [dependency-groups]
 dev = [
-  "homeassistant",
-  "pytest-homeassistant-custom-component",
+  # This pins the exact Home Assistant version the tests run against, so it
+  # is the floor that matters. 0.13.362 pins 2026.9.0b6 -- 2026.9.0 is the
+  # first release with the shared Modbus connection manager
+  # (`modbus.async_get_unit`), which this integration is built on, and which
+  # in turn requires Python >= 3.14.2.
+  "pytest-homeassistant-custom-component>=0.13.362",
   "modbus-connection[tmodbus]>=4.10.0,<5",
+  # A requirement of core's modbus integration, which Home Assistant installs
+  # at runtime but the test process has to import directly.
+  "pymodbus>=3.13.1",
   "ruff",
   "mypy",
   "types-pyserial",
 ]
 
 [tool.ruff]
+# Deliberately below the runtime floor of 3.14: at py314 the formatter strips
+# the parentheses from multi-exception except clauses (PEP 758), which reads
+# worse and is unfamiliar. Nothing here needs 3.14-only syntax.
 target-version = "py313"
 line-length = 88
 
@@ -33,9 +43,7 @@ known-first-party = ["custom_components"]
 combine-as-imports = true
 
 [tool.mypy]
-# No python_version: Home Assistant's own source uses syntax newer than the
-# minimum this project declares, so mypy must parse it as the interpreter
-# running the check does.
+python_version = "3.14"
 strict = true
 warn_unreachable = true
 
