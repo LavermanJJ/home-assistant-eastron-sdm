@@ -631,3 +631,139 @@ async def test_data_that_cannot_describe_a_link_is_refused(
     assert await flow._async_try({CONF_CONNECTION_TYPE: CONNECTION_TCP}) == {
         "base": "invalid_link"
     }
+
+
+async def test_reconfigure_offers_the_model_the_meter_reports(
+    hass: HomeAssistant, config_entry: MockConfigEntry
+) -> None:
+    """A meter contradicting its entry is the one case worth preselecting.
+
+    The entry says SDM120 and the meter says SDM630. Those have different
+    register maps, so one of the two is reading the wrong addresses -- and a
+    wrong address decodes to a plausible number rather than to an error.
+    """
+    config_entry.add_to_hass(hass)
+    result = await config_entry.start_reconfigure_flow(hass)
+
+    with serving(build_unit(SdmModel.SDM120, meter_code=0x0070)):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], SERIAL_INPUT
+        )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "model_mismatch"
+    assert result["description_placeholders"] == {
+        "meter_code": "0x0070",
+        "detected": "SDM630",
+        "configured": "SDM120",
+    }
+    suggested = {
+        key.schema: key.description["suggested_value"]
+        for key in result["data_schema"].schema
+        if key.description and "suggested_value" in key.description
+    }
+    assert suggested[CONF_MODEL] == "SDM630"
+
+    with serving(build_unit(SdmModel.SDM630)):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_MODEL: SdmModel.SDM630}
+        )
+        await hass.async_block_till_done()
+
+    assert result["reason"] == "reconfigure_successful"
+    assert config_entry.data[CONF_MODEL] == SdmModel.SDM630
+    assert config_entry.title == "SDM630 (1)"
+    assert config_entry.state is ConfigEntryState.LOADED
+
+    await hass.config_entries.async_unload(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+
+async def test_reconfigure_lets_the_user_keep_their_model(
+    hass: HomeAssistant, config_entry: MockConfigEntry
+) -> None:
+    """The detected model is offered, not imposed.
+
+    The SDM630's meter code is a field report rather than a documented one, so
+    a user who chose their model against it must be able to choose it again.
+    """
+    config_entry.add_to_hass(hass)
+    result = await config_entry.start_reconfigure_flow(hass)
+
+    with serving(build_unit(SdmModel.SDM120, meter_code=0x0070)):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], SERIAL_INPUT
+        )
+        assert result["step_id"] == "model_mismatch"
+
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_MODEL: SdmModel.SDM120}
+        )
+        await hass.async_block_till_done()
+
+    assert result["reason"] == "reconfigure_successful"
+    assert config_entry.data[CONF_MODEL] == SdmModel.SDM120
+    assert config_entry.state is ConfigEntryState.LOADED
+
+    await hass.config_entries.async_unload(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+
+async def test_reconfigure_does_not_ask_about_a_shared_register_map(
+    hass: HomeAssistant, config_entry: MockConfigEntry
+) -> None:
+    """An SDM120CT reporting the SDM120 code is correctly configured.
+
+    Both read through the same component, so renaming the user's CT to a plain
+    SDM120 would change nothing but the device page -- and would undo a
+    distinction they made on purpose.
+    """
+    config_entry.add_to_hass(hass)
+    hass.config_entries.async_update_entry(
+        config_entry, data={**config_entry.data, CONF_MODEL: SdmModel.SDM120CT}
+    )
+    result = await config_entry.start_reconfigure_flow(hass)
+
+    with serving(build_unit(meter_code=0x0020)):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {**SERIAL_INPUT, CONF_UNIT_ID: 3}
+        )
+        await hass.async_block_till_done()
+
+    assert result["reason"] == "reconfigure_successful"
+    assert config_entry.data[CONF_MODEL] == SdmModel.SDM120CT
+
+    await hass.config_entries.async_unload(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+
+async def test_abandoning_the_model_step_does_not_strand_the_entry(
+    hass: HomeAssistant, config_entry: MockConfigEntry
+) -> None:
+    """Closing the dialog mid-flow must not leave the meter dark.
+
+    The flow unloads the entry to free the port before probing. Reaching the
+    model step means it has been unloaded and not yet put back, so walking
+    away there would stop the meter until the next restart.
+    """
+    config_entry.add_to_hass(hass)
+    with serving(build_unit()):
+        await hass.config_entries.async_setup(config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    result = await config_entry.start_reconfigure_flow(hass)
+    with serving(build_unit(SdmModel.SDM120, meter_code=0x0070)):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], SERIAL_INPUT
+        )
+        assert result["step_id"] == "model_mismatch"
+        assert config_entry.state is ConfigEntryState.NOT_LOADED
+
+        hass.config_entries.flow.async_abort(result["flow_id"])
+        await hass.async_block_till_done()
+
+    assert config_entry.state is ConfigEntryState.LOADED
+    assert config_entry.data[CONF_MODEL] == SdmModel.SDM120
+
+    await hass.config_entries.async_unload(config_entry.entry_id)
+    await hass.async_block_till_done()

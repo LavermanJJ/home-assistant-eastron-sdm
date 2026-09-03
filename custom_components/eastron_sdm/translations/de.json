@@ -50,6 +50,13 @@
         "data": {
           "model": "Modell"
         }
+      },
+      "model_mismatch": {
+        "title": "Um welchen Zähler handelt es sich?",
+        "description": "Dieser Eintrag ist auf {configured} gesetzt, der Zähler meldet aber Code {meter_code} – den Code für {detected}. Die beiden haben unterschiedliche Registerbelegungen, nur eine davon liest diesen Zähler richtig. {detected} ist vorausgewählt; behalte {configured}, wenn du weißt, dass der gemeldete Code falsch ist.",
+        "data": {
+          "model": "Modell"
+        }
       }
     },
     "error": {
@@ -98,7 +105,7 @@
   "issues": {
     "model_mismatch": {
       "title": "{name} ist möglicherweise das falsche Modell",
-      "description": "{name} ist als {configured} eingerichtet, der Zähler meldet aber Code {meter_code} – den Code für {detected}. Die beiden Modelle haben unterschiedliche Registerbelegungen, jeder Wert wird also von der falschen Adresse gelesen, und eine falsche Adresse ergibt eine plausible Zahl statt eines Fehlers.\n\nWenn der Zähler tatsächlich ein {detected} ist, entferne diesen Eintrag und füge den Zähler erneut hinzu: Bei der Einrichtung wird das Modell vom Zähler selbst übernommen. Wenn {configured} stimmt und der gemeldete Code nicht, kann dies ignoriert werden."
+      "description": "{name} ist als {configured} eingerichtet, der Zähler meldet aber Code {meter_code} – den Code für {detected}. Die beiden Modelle haben unterschiedliche Registerbelegungen, jeder Wert wird also von der falschen Adresse gelesen, und eine falsche Adresse ergibt eine plausible Zahl statt eines Fehlers.\n\nZum Beheben den Zähler neu konfigurieren: Einstellungen → Geräte & Dienste → Eastron SDM → im ⋮-Menü des Zählers → Neu konfigurieren. Der Dialog schlägt {detected} zur Bestätigung vor. Wenn {configured} stimmt und der gemeldete Code nicht, dort {configured} beibehalten; dann kann dies ignoriert werden."
     }
   }
 }

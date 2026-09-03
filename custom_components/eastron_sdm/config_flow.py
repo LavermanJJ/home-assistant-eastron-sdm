@@ -65,7 +65,7 @@ from .const import (
     PARITIES,
     STOPBITS,
 )
-from .sdm import SdmModel, SdmProbe, async_ping, async_probe
+from .sdm import SdmModel, SdmProbe, async_ping, async_probe, contradicting_model
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -93,6 +93,7 @@ class SdmConfigFlow(ConfigFlow, domain=DOMAIN):
         """Initialise the flow."""
         self._data: dict[str, Any] = {}
         self._probe: SdmProbe | None = None
+        self._released = False
 
     @staticmethod
     @callback
@@ -150,47 +151,76 @@ class SdmConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_model(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Ask which model this is, when the meter did not say.
+        """Ask which model this is, when the meter's answer is not enough.
 
-        Two situations reach here and they read very differently to a user, so
-        they get their own wording through their own step id. A meter that
-        reports no code at all is the documented, expected path for the
-        SDM120CT and SDM230, whose manuals define no meter code -- telling
-        those users their meter "reported model code none, which this
+        Three situations reach here and they read very differently to a user,
+        so each gets its own wording through its own step id.
+
+        A meter that reports no code at all is the documented, expected path
+        for the SDM120CT and SDM230, whose manuals define no meter code --
+        telling those users their meter "reported model code none, which this
         integration does not recognise" would describe correct hardware as a
         fault. A meter that reports a code this integration does not know is
-        the genuinely unexpected one, and worth quoting the code back.
+        the genuinely unexpected one, and worth quoting the code back. A meter
+        that contradicts the model an existing entry is set to is the third:
+        only reachable from a reconfigure, and the one case where there is a
+        sensible answer to preselect.
 
-        Neither is a failure: the register maps are per model and the user
-        knows which meter they wired.
+        None of the three is a failure: the register maps are per model and
+        the user knows which meter they wired.
         """
         if user_input is not None:
             self._data[CONF_MODEL] = user_input[CONF_MODEL]
-            return self._async_create()
+            return self._async_save()
 
         # A zero is not a code. A meter whose manual defines none may either
         # refuse the register outright or answer it with zero, and both mean
         # the same thing to the user; only the diagnostics dump keeps the raw
         # value, where the distinction might matter to a bug report.
         code = (self._probe.meter_code if self._probe is not None else None) or None
-        return self.async_show_form(
-            step_id="model" if code is None else "model_unknown_code",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_MODEL): SelectSelector(
-                        SelectSelectorConfig(
-                            options=[
-                                SelectOptionDict(value=model, label=model)
-                                for model in SdmModel
-                            ],
-                            mode=SelectSelectorMode.LIST,
-                        )
+        contradiction = self._contradiction()
+        detected = None
+
+        if contradiction is not None:
+            reported, detected = contradiction
+            step_id = "model_mismatch"
+            placeholders = {
+                "meter_code": f"0x{reported:04X}",
+                "detected": str(detected),
+                "configured": str(self._data[CONF_MODEL]),
+            }
+        elif code is None:
+            step_id = "model"
+            placeholders = {}
+        else:
+            step_id = "model_unknown_code"
+            placeholders = {"meter_code": f"0x{code:04X}"}
+
+        schema = vol.Schema(
+            {
+                vol.Required(CONF_MODEL): SelectSelector(
+                    SelectSelectorConfig(
+                        options=[
+                            SelectOptionDict(value=model, label=model)
+                            for model in SdmModel
+                        ],
+                        mode=SelectSelectorMode.LIST,
                     )
-                }
-            ),
-            description_placeholders=(
-                {} if code is None else {"meter_code": f"0x{code:04X}"}
-            ),
+                )
+            }
+        )
+        # Preselected only where there is something to preselect. Leaving the
+        # list unset elsewhere makes the user choose rather than accept a
+        # default this integration has no basis for.
+        if detected is not None:
+            schema = self.add_suggested_values_to_schema(
+                schema, {CONF_MODEL: str(detected)}
+            )
+
+        return self.async_show_form(
+            step_id=step_id,
+            data_schema=schema,
+            description_placeholders=placeholders,
         )
 
     async def async_step_model_unknown_code(
@@ -200,6 +230,16 @@ class SdmConfigFlow(ConfigFlow, domain=DOMAIN):
 
         Same question and same handling; it exists so that variant can carry
         its own wording, which is keyed by step id.
+        """
+        return await self.async_step_model(user_input)
+
+    async def async_step_model_mismatch(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Handle the model step for a meter that contradicts its entry.
+
+        Same question and same handling, its own wording; see
+        ``async_step_model``.
         """
         return await self.async_step_model(user_input)
 
@@ -359,15 +399,37 @@ class SdmConfigFlow(ConfigFlow, domain=DOMAIN):
         entry = self._get_reconfigure_entry()
         if entry.state is ConfigEntryState.LOADED:
             await self.hass.config_entries.async_unload(entry.entry_id)
+            self._released = True
 
     @callback
     def _async_failed(self, errors: dict[str, str]) -> dict[str, str]:
         """Put a reconfigured entry back the way it was after a failed probe."""
         if self.source == SOURCE_RECONFIGURE:
-            self.hass.config_entries.async_schedule_reload(
-                self._get_reconfigure_entry().entry_id
-            )
+            self._async_restore()
         return errors
+
+    @callback
+    def _async_restore(self) -> None:
+        """Reload the entry this flow unloaded, if it still owes it one."""
+        if not self._released:
+            return
+        self._released = False
+        self.hass.config_entries.async_schedule_reload(
+            self._get_reconfigure_entry().entry_id
+        )
+
+    @callback
+    def async_remove(self) -> None:
+        """Reload a reconfigured entry if the flow was abandoned.
+
+        The flow unloads the entry to free the port before probing, and the
+        model step can leave the user sitting on a form afterwards. Closing
+        that dialog must not leave their meter dark until the next restart.
+
+        Called on every removal, including a successful one -- which is why
+        finishing clears the debt first, so this reloads nothing twice.
+        """
+        self._async_restore()
 
     async def _async_identify(self, params: SdmParams, unit_id: int) -> SdmProbe:
         """Read the meter's identity, tolerating a missing device-info block."""
@@ -395,7 +457,6 @@ class SdmConfigFlow(ConfigFlow, domain=DOMAIN):
         serial_number = self._probe.serial_number
 
         if self.source == SOURCE_RECONFIGURE:
-            entry = self._get_reconfigure_entry()
             if serial_number is not None:
                 # A serial number identifies the meter itself, so it is worth
                 # refusing an entry that has been pointed at a different one:
@@ -405,9 +466,13 @@ class SdmConfigFlow(ConfigFlow, domain=DOMAIN):
             # A meter with no serial number is only identified by where it sits
             # on the bus, which is exactly what this step changes -- so there is
             # nothing here to compare, and the entry keeps the ID it has.
-            return self.async_update_reload_and_abort(
-                entry, data=self._data, title=self._title()
-            )
+            if self._contradiction() is not None:
+                # The meter says it is not what the entry claims. Offered, not
+                # applied: the code for the SDM630 is a field report rather
+                # than a documented one, so a user who overrode it deliberately
+                # must not have that overridden on the way past.
+                return await self.async_step_model()
+            return self._async_save()
 
         # A serial number identifies the meter wherever it is moved to. Without
         # one, its position on the bus is the next best thing -- stable as long
@@ -422,14 +487,44 @@ class SdmConfigFlow(ConfigFlow, domain=DOMAIN):
         if self._probe.model is None:
             return await self.async_step_model()
         self._data[CONF_MODEL] = self._probe.model
-        return self._async_create()
+        return self._async_save()
+
+    @callback
+    def _contradiction(self) -> tuple[int, SdmModel] | None:
+        """Return the code the meter reports and what it names, if they clash.
+
+        ``None`` unless the meter reported a code for a model read differently
+        from the one the entry is set to. Only ever true on a reconfigure: a
+        new entry has no configured model to be contradicted, and takes the
+        probe's answer where there is one.
+
+        The code comes back alongside the model because it is quoted to the
+        user, and pairing them here is what keeps that quote from having to
+        cope with a code that cannot be absent.
+        """
+        if self._probe is None or CONF_MODEL not in self._data:
+            return None
+        code = self._probe.meter_code
+        detected = contradicting_model(code, SdmModel(self._data[CONF_MODEL]))
+        if code is None or detected is None:
+            return None
+        return code, detected
 
     def _title(self) -> str:
         """Name the entry for its model and its place on the bus."""
         return f"{self._data[CONF_MODEL]} ({int(self._data[CONF_UNIT_ID])})"
 
-    def _async_create(self) -> ConfigFlowResult:
-        """Create the entry."""
+    def _async_save(self) -> ConfigFlowResult:
+        """Create the entry, or update the one being reconfigured.
+
+        Clears the reload this flow owes the entry first: the update reloads
+        it, and ``async_remove`` must not schedule a second one behind it.
+        """
+        if self.source == SOURCE_RECONFIGURE:
+            self._released = False
+            return self.async_update_reload_and_abort(
+                self._get_reconfigure_entry(), data=self._data, title=self._title()
+            )
         return self.async_create_entry(title=self._title(), data=self._data)
 
 

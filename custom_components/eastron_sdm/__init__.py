@@ -11,7 +11,7 @@ from homeassistant.helpers import issue_registry as ir
 from .connection import build_params
 from .const import CONF_UNIT_ID, DOMAIN
 from .coordinator import SdmConfigEntry, SdmCoordinator
-from .sdm import MEASUREMENTS, METER_CODES, SdmMeter, SdmModel
+from .sdm import SdmMeter, SdmModel, contradicting_model
 
 PLATFORMS: list[Platform] = [Platform.SENSOR]
 
@@ -77,20 +77,12 @@ def _async_check_model(
     know better than the meter code, and taking their meter away over it would
     be worse than letting it run.
 
-    Raised and cleared on every setup, so correcting the model through the
-    reconfigure flow retires the issue with no further bookkeeping.
+    Raised and cleared on every setup, so accepting the reconfigure flow's
+    correction retires the issue with no further bookkeeping.
     """
-    code = meter.info.meter_code
-    detected = METER_CODES.get(code) if code is not None else None
-    # Compared by register map, not by model name. An SDM120CT is an SDM120 in
-    # firmware and shares its map, so a CT reporting 0x0020 is correctly
-    # configured -- flagging it would ask the user to fix something that is
-    # right and would read identically either way.
-    if (
-        code is None
-        or detected is None
-        or MEASUREMENTS[detected] is MEASUREMENTS[model]
-    ):
+    if (code := meter.info.meter_code) is None or (
+        detected := contradicting_model(code, model)
+    ) is None:
         ir.async_delete_issue(hass, DOMAIN, _model_issue_id(entry))
         return
 

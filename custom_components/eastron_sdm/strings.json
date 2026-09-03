@@ -50,6 +50,13 @@
         "data": {
           "model": "Model"
         }
+      },
+      "model_mismatch": {
+        "title": "Which meter is this?",
+        "description": "This entry is set to {configured}, but the meter reports code {meter_code} — the code for {detected}. The two have different register maps, so only one of them reads this meter correctly. {detected} is preselected; keep {configured} if you know the reported code is wrong.",
+        "data": {
+          "model": "Model"
+        }
       }
     },
     "error": {
@@ -98,7 +105,7 @@
   "issues": {
     "model_mismatch": {
       "title": "{name} may be the wrong model",
-      "description": "{name} is set up as {configured}, but the meter reports code {meter_code} — the code for {detected}. The two models have different register maps, so every value is read from the wrong address, and a wrong address decodes into a plausible number rather than into an error.\n\nIf the meter really is {detected}, remove this entry and add the meter again: setup takes the model from the meter itself. If you know {configured} is right and the reported code is not, this can be ignored."
+      "description": "{name} is set up as {configured}, but the meter reports code {meter_code} — the code for {detected}. The two models have different register maps, so every value is read from the wrong address, and a wrong address decodes into a plausible number rather than into an error.\n\nTo fix it, reconfigure this meter: Settings → Devices & services → Eastron SDM → the meter's ⋮ menu → Reconfigure. The flow offers {detected} for you to confirm. If you know {configured} is right and the reported code is not, keep {configured} there, and this can be ignored."
     }
   },
   "entity": {

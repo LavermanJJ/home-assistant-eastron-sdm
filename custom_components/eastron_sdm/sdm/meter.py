@@ -36,6 +36,27 @@ MEASUREMENTS: dict[SdmModel, type[Component]] = {
 }
 
 
+def contradicting_model(code: int | None, configured: SdmModel) -> SdmModel | None:
+    """Return the model ``code`` names, if it is read differently from ``configured``.
+
+    ``None`` means the meter does not contradict the configured model: either
+    it reported no code, or a code this library does not know, or a code for a
+    model sharing the configured one's register map. That last case is the
+    SDM120CT, which is an SDM120 in firmware -- a CT reporting ``0x0020`` is
+    correctly configured and would read identically under either name, so
+    calling it a mismatch would ask the user to fix something that is right.
+
+    Compared by component identity rather than by model name, so a model added
+    later that reuses an existing map is covered without a second list.
+    """
+    if code is None:
+        return None
+    detected = METER_CODES.get(code)
+    if detected is None or MEASUREMENTS[detected] is MEASUREMENTS[configured]:
+        return None
+    return detected
+
+
 @dataclass(frozen=True, kw_only=True)
 class SdmInfo:
     """What the meter says about itself, read once at setup."""

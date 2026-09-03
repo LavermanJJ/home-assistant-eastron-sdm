@@ -68,6 +68,11 @@ its unit ID. The integration reads the meter's identity block to work out the
 model and serial number; if the meter reports a code it does not recognise, it
 asks you which model it is rather than refusing.
 
+*Reconfigure*, on an existing meter, changes its link settings or unit ID. It
+re-reads the identity block on the way through, so a meter that contradicts the
+model the entry is set to gets that raised there — with the reported model
+preselected — instead of being left to read the wrong registers.
+
 Adding the rest of the meters on the same bus is quick: the form is prefilled
 from the last meter you configured the same way, so only the unit ID changes.
 
@@ -220,9 +225,11 @@ itself.
 **A repair issue says the model may be wrong.** The meter reports a model code
 whose register map is not the one configured, so every value is being read from
 the wrong address — and a wrong address decodes to a plausible number, not to
-an error. Remove the entry and add the meter again; setup takes the model from
-the meter. If you are sure the configured model is right and the reported code
-is not, the issue can be ignored.
+an error. Run *Reconfigure* on that meter: the flow notices the contradiction
+and offers the model the meter reports, preselected, for you to confirm. It is
+offered rather than applied, because the SDM630's meter code is a field report
+rather than a documented one — so if you are sure the configured model is right
+and the reported code is not, keep it and the issue can be ignored.
 
 **Readings look plausible but wrong.** Compare voltage, current, active power
 and total energy against the meter's own display. A one-register slip or a
