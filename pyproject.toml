@@ -18,6 +18,9 @@ dev = [
   # A requirement of core's modbus integration, which Home Assistant installs
   # at runtime but the test process has to import directly.
   "pymodbus>=3.13.1",
+  # Declared in the manifest so Home Assistant installs it; the tests that
+  # exercise serial-port listing patch it directly, so it must be here too.
+  "pyserial>=3.5",
   "ruff",
   "mypy",
   "types-pyserial",
