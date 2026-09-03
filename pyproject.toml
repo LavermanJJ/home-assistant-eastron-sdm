@@ -1,0 +1,48 @@
+[project]
+name = "home-assistant-eastron-sdm"
+version = "0.1.0"
+description = "Home Assistant integration for Eastron SDM energy meters over Modbus"
+readme = "README.md"
+requires-python = ">=3.13"
+license = { text = "MIT" }
+
+[dependency-groups]
+dev = [
+  "homeassistant",
+  "pytest-homeassistant-custom-component",
+  "modbus-connection[tmodbus]>=4.10.0,<5",
+  "ruff",
+  "mypy",
+  "types-pyserial",
+]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "D", "RUF", "ASYNC", "TID"]
+ignore = ["D203", "D213"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["D100", "D103"]
+
+[tool.ruff.lint.isort]
+force-sort-within-sections = true
+known-first-party = ["custom_components"]
+combine-as-imports = true
+
+[tool.mypy]
+# No python_version: Home Assistant's own source uses syntax newer than the
+# minimum this project declares, so mypy must parse it as the interpreter
+# running the check does.
+strict = true
+warn_unreachable = true
+
+[[tool.mypy.overrides]]
+module = ["homeassistant.*", "pytest_homeassistant_custom_component.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

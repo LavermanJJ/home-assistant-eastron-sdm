@@ -1,0 +1,94 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Eastron SDM",
+        "description": "Wie ist dieser Zähler angebunden?",
+        "menu_options": {
+          "serial": "RS485-Schnittstelle",
+          "tcp": "TCP (Gateway oder Modbus-TCP-Zähler)"
+        }
+      },
+      "serial": {
+        "title": "Serielle Verbindung",
+        "description": "Alle Zähler an einem RS485-Bus müssen dieselbe Baudrate, Parität und Stoppbits verwenden. Nur die Unit-ID unterscheidet sie.",
+        "data": {
+          "device": "Serielle Schnittstelle",
+          "baudrate": "Baudrate",
+          "parity": "Parität",
+          "stopbits": "Stoppbits",
+          "unit_id": "Unit-ID"
+        },
+        "data_description": {
+          "device": "Der USB-RS485-Konverter, zum Beispiel /dev/ttyUSB0.",
+          "unit_id": "Die Modbus-Adresse des Zählers, 1 bis 247. Am Zähler im Menü für die Modbus-Einstellungen ablesbar."
+        }
+      },
+      "tcp": {
+        "title": "TCP-Verbindung",
+        "data": {
+          "host": "Host",
+          "port": "Port",
+          "framer": "Rahmenformat",
+          "unit_id": "Unit-ID"
+        },
+        "data_description": {
+          "framer": "RTU über TCP für ein serielles Gateway wie ser2net oder einen Waveshare-Adapter, Modbus TCP für einen Zähler, der es direkt spricht.",
+          "unit_id": "Die Modbus-Adresse des Zählers, 1 bis 247."
+        }
+      },
+      "model": {
+        "title": "Um welchen Zähler handelt es sich?",
+        "description": "Der Zähler hat geantwortet, meldet aber den Gerätecode {meter_code}, den diese Integration nicht kennt. Wähle das Modell, damit die richtige Registerbelegung verwendet wird.",
+        "data": {
+          "model": "Modell"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Keine Antwort von dieser Unit-ID. Prüfe Verkabelung, A/B-Polarität, Baudrate und die Modbus-Adresse des Zählers.",
+      "invalid_link": "Diese Verbindungsangaben sind unvollständig.",
+      "bus_settings_conflict": "Diese Schnittstelle wird bereits mit anderen Leitungseinstellungen verwendet. Alle Zähler an einem RS485-Bus müssen dieselbe Baudrate, Parität und Stoppbits verwenden."
+    },
+    "abort": {
+      "already_configured": "Dieser Zähler ist bereits eingerichtet.",
+      "different_meter": "Das ist ein anderer Zähler als der, für den dieser Eintrag angelegt wurde.",
+      "reconfigure_successful": "Zähler neu konfiguriert."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Abfrage",
+        "data": {
+          "scan_interval": "Abfrageintervall"
+        },
+        "data_description": {
+          "scan_interval": "Wie oft dieser Zähler gelesen wird. Zähler an derselben Schnittstelle teilen sich eine Verbindung und warten aufeinander, daher kann ein kurzes Intervall bei vielen Zählern den Bus auslasten."
+        }
+      }
+    }
+  },
+  "selector": {
+    "framer": {
+      "options": {
+        "socket": "Modbus TCP",
+        "rtu": "RTU über TCP"
+      }
+    }
+  },
+  "exceptions": {
+    "invalid_entry": {
+      "message": "Die gespeicherten Verbindungsangaben sind unvollständig."
+    },
+    "bus_settings_conflict": {
+      "message": "Der Bus konnte nicht geöffnet werden: {error}"
+    },
+    "cannot_connect": {
+      "message": "Der Zähler hat nicht geantwortet: {error}"
+    },
+    "poll_failed": {
+      "message": "Fehler beim Lesen des Zählers: {error}"
+    }
+  }
+}

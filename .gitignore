@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Manufacturer protocol documents; see docs/README.md for where to get them.
+docs/*.pdf

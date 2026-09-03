@@ -1,0 +1,23 @@
+{
+  "domain": "eastron_sdm",
+  "name": "Eastron SDM",
+  "codeowners": [
+    "@LavermanJJ"
+  ],
+  "config_flow": true,
+  "dependencies": [
+    "modbus"
+  ],
+  "documentation": "https://github.com/LavermanJJ/home-assistant-eastron-sdm",
+  "integration_type": "device",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/LavermanJJ/home-assistant-eastron-sdm/issues",
+  "loggers": [
+    "modbus_connection"
+  ],
+  "requirements": [
+    "modbus-connection>=4.10.0,<5",
+    "pyserial>=3.5"
+  ],
+  "version": "0.1.0"
+}
