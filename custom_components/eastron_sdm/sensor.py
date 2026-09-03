@@ -30,6 +30,11 @@ from .coordinator import SdmConfigEntry
 from .entity import SdmEntity
 from .sdm import SdmInfo
 
+# Read-only platform behind a coordinator: entities never write to the meter,
+# and every request on a port is already serialized behind the shared
+# connection's lock. There is nothing here for Home Assistant to throttle.
+PARALLEL_UPDATES = 0
+
 MEASUREMENT = SensorStateClass.MEASUREMENT
 TOTAL = SensorStateClass.TOTAL
 TOTAL_INCREASING = SensorStateClass.TOTAL_INCREASING

@@ -80,6 +80,25 @@ Each meter's own settings are readable from its front panel under the Modbus
 menu — and after setup, from the Node address and Line settings diagnostic
 sensors.
 
+## Removing a meter
+
+*Settings → Devices & services → Eastron SDM → the meter's ⋮ menu → Delete.*
+
+Each meter is its own config entry, so deleting one leaves the rest of the bus
+running. The connection is shared and reference-counted: the port stays open
+until the **last** entry using it goes, and is closed and released only then.
+
+Deleting takes the device, its entities and their recorded history with it. To
+stop polling a meter without losing its statistics, choose *Disable* from the
+same menu instead — that releases its claim on the connection and leaves the
+history intact.
+
+To remove the integration itself, delete every meter first, then uninstall it
+in HACS (or delete `config/custom_components/eastron_sdm/`) and restart. Home
+Assistant closes the shared connection when the last entry unloads, so nothing
+is left holding the serial port.
+
+
 ## Energy dashboard
 
 Import and export active energy carry `device_class: energy`, kWh, and
@@ -90,6 +109,65 @@ rather than as a large negative reading.
 Note that on the SDM120 the meaning of *total* active energy depends on the
 meter's own measurement-mode register: import only, import + export (the
 default), or import − export. Import and export are unambiguous; prefer them.
+
+## Automation examples
+
+Entity IDs follow the entry title, so a meter named *SDM630 (1)* gives
+`sensor.sdm630_1_voltage_l1`. Adjust the names below to match yours.
+
+Warn when a phase sags — a loose neutral or an overloaded leg shows up here
+long before anything trips:
+
+```yaml
+automation:
+  - alias: Phase voltage low
+    triggers:
+      - trigger: numeric_state
+        entity_id:
+          - sensor.sdm630_1_voltage_l1
+          - sensor.sdm630_1_voltage_l2
+          - sensor.sdm630_1_voltage_l3
+        below: 210
+        for: "00:01:00"
+    actions:
+      - action: notify.persistent_notification
+        data:
+          message: "{{ trigger.to_state.name }} is {{ trigger.to_state.state }} V"
+```
+
+Track how unbalanced the three phases are, which is what actually heats up a
+neutral conductor:
+
+```yaml
+template:
+  - sensor:
+      - name: Phase imbalance
+        unit_of_measurement: "%"
+        state_class: measurement
+        state: >
+          {% set p = [
+            states('sensor.sdm630_1_active_power_l1') | float(0),
+            states('sensor.sdm630_1_active_power_l2') | float(0),
+            states('sensor.sdm630_1_active_power_l3') | float(0),
+          ] %}
+          {% set avg = (p | sum) / 3 %}
+          {{ 0 if avg == 0 else
+             ((p | max) - (p | min)) / avg * 100 | round(1) }}
+```
+
+Split one meter's lifetime counter into daily and monthly figures, without
+touching the meter's own resettable registers:
+
+```yaml
+utility_meter:
+  heat_pump_daily:
+    source: sensor.sdm120_2_import_active_energy
+    cycle: daily
+  heat_pump_monthly:
+    source: sensor.sdm120_2_import_active_energy
+    cycle: monthly
+```
+
 
 ## Entities
 
@@ -113,6 +191,57 @@ saturate it. Adjust under the integration's *Configure* option.
 If a meter rejects a block read with an illegal-data-address exception, its
 model class in `custom_components/eastron_sdm/sdm/` carries `register_ranges`
 and `max_span` to cut the planner back to what that unit answers.
+
+## Troubleshooting
+
+**"No answer from that unit ID."** Work down this list in order — each step
+rules out the ones below it.
+
+1. **A/B polarity.** By far the commonest fault, and it looks exactly like a
+   dead meter. Swap the two data lines and try again; RS485 is differential
+   and nothing is harmed by having had them the wrong way round.
+2. **The meter's own address.** Read it off the front panel under the Modbus
+   menu. The factory default is 1, so two meters straight out of the box both
+   answer to 1 and collide — give each its own address before wiring the
+   second one on.
+3. **Line settings.** Baud rate, parity and stop bits have to match what the
+   meter is set to. The SDM630 leaves the factory at 9600 8N1.
+4. **Termination and stub length.** A long run with no 120 Ω resistor at each
+   end, or a short one with both fitted, tends to show up as reads that
+   sometimes work rather than as a clean failure.
+
+**"That port is already in use with different line settings."** Another entry
+holds the port at a different baud rate or parity. Every meter on one bus must
+agree, so one of the two entries is wrong: check both meters' front panels and
+*Reconfigure* whichever is misdescribed. The flow releases the entry's own
+connection before probing, so changing a baud rate does not conflict with
+itself.
+
+**A repair issue says the model may be wrong.** The meter reports a model code
+whose register map is not the one configured, so every value is being read from
+the wrong address — and a wrong address decodes to a plausible number, not to
+an error. Remove the entry and add the meter again; setup takes the model from
+the meter. If you are sure the configured model is right and the reported code
+is not, the issue can be ignored.
+
+**Readings look plausible but wrong.** Compare voltage, current, active power
+and total energy against the meter's own display. A one-register slip or a
+reversed word order decodes to a believable number, so only the display settles
+it. If they disagree, the diagnostics download (device page → ⋮ → *Download
+diagnostics*) has the raw decoded values and belongs in the bug report.
+
+**Entities drop to unavailable now and then.** The bus is probably saturated:
+every meter on a port queues behind the others on one connection, so six meters
+at 2400 baud cannot all be polled every 10 seconds. Raise the scan interval
+under *Configure*, or move the bus to a higher baud rate — all of the meters on
+it, together.
+
+**A meter rejects a block read with an illegal-data-address exception.** Some
+units answer a narrower range than their protocol document promises. Its model
+class in `custom_components/eastron_sdm/sdm/` carries `register_ranges` and
+`max_span`; cutting those back to what the unit answers fixes it, and is worth
+reporting so the map can be corrected.
+
 
 ## Register maps
 
@@ -167,7 +296,8 @@ maps are declarative: an address, a type, a unit.
    difference — as `sdm230.py` and `sdm630mct.py` do.
 2. Add the model to `SdmModel` and to `MEASUREMENTS` in `sdm/meter.py`, and its
    meter code to `METER_CODES` in `sdm/const.py`.
-3. Add any new field names to `SENSORS` in `sensor.py` and to `strings.json`.
+3. Add any new field names to `SENSORS` in `sensor.py` and to `strings.json`,
+   and give each one an icon in `icons.json` if it carries no device class.
 4. Record the document and its version in `docs/README.md`.
 
 `test_every_model_field_becomes_a_sensor` fails if step 3 is forgotten.
@@ -195,9 +325,10 @@ to a plausible number rather than to an error.
 
 Measured against Home Assistant's [integration quality
 scale](https://developers.home-assistant.io/docs/core/integration-quality-scale/),
-this reaches platinum on the platinum rules themselves but not on the tiers
-below it: seven rules are still open, tracked with a reason each in
+every rule through platinum is met or exempt, with a reason on each exemption in
 [`custom_components/eastron_sdm/quality_scale.yaml`](custom_components/eastron_sdm/quality_scale.yaml).
+The scale gates core integrations and binds nothing here, so treat it as a
+checklist that was worked through rather than as a badge.
 
 ## Licence
 

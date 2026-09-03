@@ -94,5 +94,11 @@
     "poll_failed": {
       "message": "Fehler beim Lesen des Zählers: {error}"
     }
+  },
+  "issues": {
+    "model_mismatch": {
+      "title": "{name} ist möglicherweise das falsche Modell",
+      "description": "{name} ist als {configured} eingerichtet, der Zähler meldet aber Code {meter_code} – den Code für {detected}. Die beiden Modelle haben unterschiedliche Registerbelegungen, jeder Wert wird also von der falschen Adresse gelesen, und eine falsche Adresse ergibt eine plausible Zahl statt eines Fehlers.\n\nWenn der Zähler tatsächlich ein {detected} ist, entferne diesen Eintrag und füge den Zähler erneut hinzu: Bei der Einrichtung wird das Modell vom Zähler selbst übernommen. Wenn {configured} stimmt und der gemeldete Code nicht, kann dies ignoriert werden."
+    }
   }
 }

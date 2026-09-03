@@ -8,10 +8,9 @@ from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import CONF_MODEL
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import device_registry as dr, issue_registry as ir
 from modbus_connection.exceptions import ModbusTimeoutError
 from modbus_connection.mock import MockModbusUnit
-import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.eastron_sdm.const import DOMAIN
@@ -79,15 +78,13 @@ async def test_conflicting_line_settings_fail_the_entry(
 
 
 async def test_wrong_model_is_flagged_not_silently_wrong(
-    hass: HomeAssistant,
-    config_entry: MockConfigEntry,
-    caplog: pytest.LogCaptureFixture,
+    hass: HomeAssistant, config_entry: MockConfigEntry
 ) -> None:
     """A mismatched model reads the wrong registers and looks plausible.
 
     The entry still loads -- the user may know better than the meter code --
-    but the log has to say so, because every value would otherwise be quietly
-    off by a few registers.
+    but it has to be raised somewhere the user will meet it, because every
+    value would otherwise be quietly off by a few registers.
     """
     unit = build_unit(SdmModel.SDM120, meter_code=0x0070)  # reports SDM630
     config_entry.add_to_hass(hass)
@@ -96,7 +93,70 @@ async def test_wrong_model_is_flagged_not_silently_wrong(
         await hass.async_block_till_done()
 
     assert config_entry.state is ConfigEntryState.LOADED
-    assert "configured as SDM120 but reports meter code 0x0070" in caplog.text
+    issue = ir.async_get(hass).async_get_issue(
+        DOMAIN, f"model_mismatch_{config_entry.entry_id}"
+    )
+    assert issue is not None
+    assert issue.translation_placeholders == {
+        "name": "SDM120 (1)",
+        "configured": "SDM120",
+        "detected": "SDM630",
+        "meter_code": "0x0070",
+    }
+
+
+async def test_correcting_the_model_retires_the_issue(
+    hass: HomeAssistant, config_entry: MockConfigEntry
+) -> None:
+    """The issue is raised and cleared on every setup, so a fix clears it.
+
+    Nothing watches for the correction: setting the entry up again with a
+    meter that agrees is what retires it.
+    """
+    issue_id = f"model_mismatch_{config_entry.entry_id}"
+    config_entry.add_to_hass(hass)
+    with patch(
+        "custom_components.eastron_sdm.async_get_unit",
+        return_value=build_unit(SdmModel.SDM120, meter_code=0x0070),
+    ):
+        await hass.config_entries.async_setup(config_entry.entry_id)
+        await hass.async_block_till_done()
+    assert ir.async_get(hass).async_get_issue(DOMAIN, issue_id) is not None
+
+    await hass.config_entries.async_unload(config_entry.entry_id)
+    await hass.async_block_till_done()
+    with patch(
+        "custom_components.eastron_sdm.async_get_unit",
+        return_value=build_unit(SdmModel.SDM120, meter_code=0x0020),
+    ):
+        await hass.config_entries.async_setup(config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    assert ir.async_get(hass).async_get_issue(DOMAIN, issue_id) is None
+
+
+async def test_removing_the_entry_takes_its_issue_with_it(
+    hass: HomeAssistant, config_entry: MockConfigEntry
+) -> None:
+    """An issue outlives its config entry unless the integration says so.
+
+    One about a meter that is no longer set up cannot be acted on, so it would
+    sit in the repairs list for good.
+    """
+    issue_id = f"model_mismatch_{config_entry.entry_id}"
+    config_entry.add_to_hass(hass)
+    with patch(
+        "custom_components.eastron_sdm.async_get_unit",
+        return_value=build_unit(SdmModel.SDM120, meter_code=0x0070),
+    ):
+        await hass.config_entries.async_setup(config_entry.entry_id)
+        await hass.async_block_till_done()
+    assert ir.async_get(hass).async_get_issue(DOMAIN, issue_id) is not None
+
+    await hass.config_entries.async_remove(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert ir.async_get(hass).async_get_issue(DOMAIN, issue_id) is None
 
 
 async def test_incomplete_entry_data_fails_the_entry(
@@ -138,11 +198,11 @@ async def test_sdm630_sets_up_with_its_own_register_map(
 
 
 async def test_sdm120ct_reporting_the_sdm120_code_is_not_a_mismatch(
-    hass: HomeAssistant, config_entry: MockConfigEntry, caplog: pytest.LogCaptureFixture
+    hass: HomeAssistant, config_entry: MockConfigEntry
 ) -> None:
     """A CT variant is an SDM120 in firmware and shares its register map.
 
-    Warning here would ask the user to fix a configuration that is correct and
+    Flagging it would ask the user to fix a configuration that is correct and
     that would read identically either way.
     """
     config_entry.add_to_hass(hass)
@@ -157,4 +217,9 @@ async def test_sdm120ct_reporting_the_sdm120_code_is_not_a_mismatch(
         await hass.async_block_till_done()
 
     assert config_entry.state is ConfigEntryState.LOADED
-    assert "reports meter code" not in caplog.text
+    assert (
+        ir.async_get(hass).async_get_issue(
+            DOMAIN, f"model_mismatch_{config_entry.entry_id}"
+        )
+        is None
+    )

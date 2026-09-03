@@ -2,19 +2,16 @@
 
 from __future__ import annotations
 
-import logging
-
 from homeassistant.components.modbus import async_get_unit
 from homeassistant.const import CONF_MODEL, Platform
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryError, HomeAssistantError
+from homeassistant.helpers import issue_registry as ir
 
 from .connection import build_params
 from .const import CONF_UNIT_ID, DOMAIN
 from .coordinator import SdmConfigEntry, SdmCoordinator
 from .sdm import MEASUREMENTS, METER_CODES, SdmMeter, SdmModel
-
-_LOGGER = logging.getLogger(__name__)
 
 PLATFORMS: list[Platform] = [Platform.SENSOR]
 
@@ -50,21 +47,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: SdmConfigEntry) -> bool:
     # caught by the first coordinator refresh below.
     await meter.async_setup()
 
-    if (code := meter.info.meter_code) is not None:
-        detected = METER_CODES.get(code)
-        # Compared by register map, not by model name. An SDM120CT is an
-        # SDM120 in firmware and shares its map, so a CT reporting 0x0020 is
-        # correctly configured -- warning there would ask the user to fix
-        # something that is right and would read identically either way.
-        if detected is not None and MEASUREMENTS[detected] is not MEASUREMENTS[model]:
-            _LOGGER.warning(
-                "%s is configured as %s but reports meter code 0x%04X (%s). "
-                "Reconfigure the entry if the wrong model was chosen",
-                entry.title,
-                model,
-                code,
-                detected,
-            )
+    _async_check_model(hass, entry, meter, model)
 
     coordinator = SdmCoordinator(hass, entry, meter)
     await coordinator.async_config_entry_first_refresh()
@@ -72,6 +55,68 @@ async def async_setup_entry(hass: HomeAssistant, entry: SdmConfigEntry) -> bool:
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
+
+
+def _model_issue_id(entry: SdmConfigEntry) -> str:
+    """Name the model-mismatch repair issue for one entry."""
+    return f"model_mismatch_{entry.entry_id}"
+
+
+@callback
+def _async_check_model(
+    hass: HomeAssistant,
+    entry: SdmConfigEntry,
+    meter: SdmMeter,
+    model: SdmModel,
+) -> None:
+    """Raise a repair issue if the meter contradicts the configured model.
+
+    The entry still loads. A mismatch reads the wrong registers and decodes
+    them into plausible numbers rather than into an error, so it has to be
+    visible somewhere the user will actually meet it -- but the user may also
+    know better than the meter code, and taking their meter away over it would
+    be worse than letting it run.
+
+    Raised and cleared on every setup, so correcting the model through the
+    reconfigure flow retires the issue with no further bookkeeping.
+    """
+    code = meter.info.meter_code
+    detected = METER_CODES.get(code) if code is not None else None
+    # Compared by register map, not by model name. An SDM120CT is an SDM120 in
+    # firmware and shares its map, so a CT reporting 0x0020 is correctly
+    # configured -- flagging it would ask the user to fix something that is
+    # right and would read identically either way.
+    if (
+        code is None
+        or detected is None
+        or MEASUREMENTS[detected] is MEASUREMENTS[model]
+    ):
+        ir.async_delete_issue(hass, DOMAIN, _model_issue_id(entry))
+        return
+
+    ir.async_create_issue(
+        hass,
+        DOMAIN,
+        _model_issue_id(entry),
+        is_fixable=False,
+        severity=ir.IssueSeverity.WARNING,
+        translation_key="model_mismatch",
+        translation_placeholders={
+            "name": entry.title,
+            "configured": str(model),
+            "detected": str(detected),
+            "meter_code": f"0x{code:04X}",
+        },
+    )
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: SdmConfigEntry) -> None:
+    """Retire this entry's repair issue along with the entry itself.
+
+    Issues outlive the config entry that raised them, and one about a meter
+    that is no longer set up cannot be acted on.
+    """
+    ir.async_delete_issue(hass, DOMAIN, _model_issue_id(entry))
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: SdmConfigEntry) -> bool:

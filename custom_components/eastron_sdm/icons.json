@@ -1,0 +1,72 @@
+{
+  "entity": {
+    "sensor": {
+      "average_current_thd": {
+        "default": "mdi:sine-wave"
+      },
+      "average_voltage_thd_ll": {
+        "default": "mdi:sine-wave"
+      },
+      "average_voltage_thd_ln": {
+        "default": "mdi:sine-wave"
+      },
+      "baud_rate": {
+        "default": "mdi:speedometer"
+      },
+      "current_thd_l1": {
+        "default": "mdi:sine-wave"
+      },
+      "current_thd_l2": {
+        "default": "mdi:sine-wave"
+      },
+      "current_thd_l3": {
+        "default": "mdi:sine-wave"
+      },
+      "line_settings": {
+        "default": "mdi:tune"
+      },
+      "node_address": {
+        "default": "mdi:identifier"
+      },
+      "phase_angle": {
+        "default": "mdi:angle-acute"
+      },
+      "phase_angle_l1": {
+        "default": "mdi:angle-acute"
+      },
+      "phase_angle_l2": {
+        "default": "mdi:angle-acute"
+      },
+      "phase_angle_l3": {
+        "default": "mdi:angle-acute"
+      },
+      "total_ampere_hours": {
+        "default": "mdi:current-ac"
+      },
+      "total_apparent_energy": {
+        "default": "mdi:flash-outline"
+      },
+      "total_system_phase_angle": {
+        "default": "mdi:angle-acute"
+      },
+      "voltage_thd_l1": {
+        "default": "mdi:sine-wave"
+      },
+      "voltage_thd_l1_l2": {
+        "default": "mdi:sine-wave"
+      },
+      "voltage_thd_l2": {
+        "default": "mdi:sine-wave"
+      },
+      "voltage_thd_l2_l3": {
+        "default": "mdi:sine-wave"
+      },
+      "voltage_thd_l3": {
+        "default": "mdi:sine-wave"
+      },
+      "voltage_thd_l3_l1": {
+        "default": "mdi:sine-wave"
+      }
+    }
+  }
+}

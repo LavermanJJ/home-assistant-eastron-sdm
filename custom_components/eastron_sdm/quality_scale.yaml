@@ -9,9 +9,9 @@
 # Assessed against the checklist at
 # https://developers.home-assistant.io/docs/core/integration-quality-scale/checklist
 #
-# The manifest deliberately carries no `quality_scale` key: the tiers are
-# cumulative, and bronze is not met yet. Adding the key would claim a tier the
-# rules below say has not been reached.
+# The manifest carries no `quality_scale` key. The key is read by core's own
+# tooling, which does not run on a custom integration, so it would assert a
+# tier nothing here checks.
 rules:
   # Bronze
   action-setup:
@@ -21,12 +21,7 @@ rules:
   appropriate-polling: done
   brands: done
   common-modules: done
-  config-flow-test-coverage:
-    status: todo
-    comment: |
-      96%, not the 100% the rule asks for. Three paths are unreached: the TCP
-      branch of `async_step_reconfigure`, the `invalid_link` guard in
-      `_async_try`, and its catch-all `ModbusError` arm.
+  config-flow-test-coverage: done
   config-flow: done
   dependency-transparency: done
   docs-actions:
@@ -39,11 +34,7 @@ rules:
       This integration provides no conditions.
   docs-high-level-description: done
   docs-installation-instructions: done
-  docs-removal-instructions:
-    status: todo
-    comment: |
-      The README does not say how to remove the integration, or that deleting
-      the last entry on a port is what closes the shared connection.
+  docs-removal-instructions: done
   docs-triggers:
     status: exempt
     comment: |
@@ -71,14 +62,7 @@ rules:
   entity-unavailable: done
   integration-owner: done
   log-when-unavailable: done
-  parallel-updates:
-    status: todo
-    comment: |
-      `PARALLEL_UPDATES` is not declared in `sensor.py`. Nothing is actually
-      concurrent -- the platform is read-only and every request on a port is
-      serialized behind the shared connection's lock -- but the rule asks for
-      the declaration, and `0` is the honest value for a coordinator-driven
-      read-only platform.
+  parallel-updates: done
   reauthentication-flow:
     status: exempt
     comment: |
@@ -100,22 +84,11 @@ rules:
       user set on its own front panel, over a port only the user knows is
       wired. Sweeping unit IDs would mean driving someone's bus uninvited.
   docs-data-update: done
-  docs-examples:
-    status: todo
-    comment: |
-      The README shows no automation or template examples -- no low-voltage
-      alert, no per-phase imbalance check, no utility-meter helper on a
-      per-phase energy counter.
+  docs-examples: done
   docs-known-limitations: done
   docs-supported-devices: done
   docs-supported-functions: done
-  docs-troubleshooting:
-    status: todo
-    comment: |
-      Diagnosis is spread across the config-flow error strings, the polling
-      section's note on `register_ranges`, and the bus-settings rule. It is
-      not gathered anywhere a user hunting a silent meter would look: no A/B
-      polarity, termination, unit-ID collision, or "port already open".
+  docs-troubleshooting: done
   docs-use-cases: done
   dynamic-devices:
     status: exempt
@@ -127,20 +100,9 @@ rules:
   entity-disabled-by-default: done
   entity-translations: done
   exception-translations: done
-  icon-translations:
-    status: todo
-    comment: |
-      There is no `icons.json`. Sensors carrying a device class are fine, but
-      phase angle, the THD sensors, node address, baud rate and line settings
-      have none and fall back to the default icon.
+  icon-translations: done
   reconfiguration-flow: done
-  repair-issues:
-    status: todo
-    comment: |
-      The model-mismatch case in `async_setup_entry` -- a meter reporting a
-      code whose register map is not the configured model's -- is a warning in
-      the log. It is exactly a repair issue: user action is needed, the entry
-      keeps running meanwhile, and the fix is one reconfigure away.
+  repair-issues: done
   stale-devices:
     status: exempt
     comment: |

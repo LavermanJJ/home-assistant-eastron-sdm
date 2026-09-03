@@ -18,10 +18,15 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.exceptions import HomeAssistantError
-from modbus_connection.exceptions import IllegalDataAddressError, ModbusTimeoutError
+from modbus_connection.exceptions import (
+    IllegalDataAddressError,
+    ModbusDesyncError,
+    ModbusTimeoutError,
+)
 from modbus_connection.mock import MockModbusUnit
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
+from custom_components.eastron_sdm.config_flow import SdmConfigFlow
 from custom_components.eastron_sdm.const import (
     CONF_BAUDRATE,
     CONF_CONNECTION_TYPE,
@@ -557,3 +562,72 @@ async def test_meter_with_no_code_is_not_described_as_a_fault(
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["data"][CONF_MODEL] == SdmModel.SDM230
+
+
+async def test_reconfigure_returns_to_the_tcp_form(
+    hass: HomeAssistant, config_entry: MockConfigEntry
+) -> None:
+    """A TCP entry must reopen as TCP, not as the serial form it never used."""
+    config_entry.add_to_hass(hass)
+    hass.config_entries.async_update_entry(
+        config_entry,
+        data={
+            CONF_CONNECTION_TYPE: CONNECTION_TCP,
+            CONF_MODEL: SdmModel.SDM120,
+            **TCP_INPUT,
+        },
+    )
+
+    result = await config_entry.start_reconfigure_flow(hass)
+    assert result["step_id"] == CONNECTION_TCP
+
+    with serving(build_unit()):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {**TCP_INPUT, CONF_PORT: 5020}
+        )
+        await hass.async_block_till_done()
+
+    assert result["reason"] == "reconfigure_successful"
+    assert config_entry.data[CONF_PORT] == 5020
+    assert config_entry.data[CONF_CONNECTION_TYPE] == CONNECTION_TCP
+
+    await hass.config_entries.async_unload(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+
+async def test_a_garbled_frame_is_reported_as_cannot_connect(
+    hass: HomeAssistant,
+) -> None:
+    """A desynced RS485 line is a bus fault, not a Home Assistant crash.
+
+    Noise, a missing termination resistor or a second master talking over the
+    conversation all surface as a frame that does not parse -- which is
+    neither a timeout nor a refusal, and so falls to the catch-all arm.
+    """
+    unit = build_unit()
+    unit.fail_requests(ModbusDesyncError("frame out of step"))
+
+    flow_id = await _start_serial(hass)
+    with serving(unit):
+        result = await hass.config_entries.flow.async_configure(flow_id, SERIAL_INPUT)
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"base": "cannot_connect"}
+
+
+async def test_data_that_cannot_describe_a_link_is_refused(
+    hass: HomeAssistant,
+) -> None:
+    """The probe must not be reached with parameters that cannot be built.
+
+    Nothing the forms accept can get here today -- every field `build_params`
+    reads is required by the schema -- so this drives the guard directly. It
+    is what keeps a future selector or model from turning a malformed entry
+    into a traceback on the way to the bus.
+    """
+    flow = SdmConfigFlow()
+    flow.hass = hass
+
+    assert await flow._async_try({CONF_CONNECTION_TYPE: CONNECTION_TCP}) == {
+        "base": "invalid_link"
+    }
