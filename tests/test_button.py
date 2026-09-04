@@ -89,6 +89,32 @@ async def test_a_failed_write_is_reported_not_swallowed(hass: HomeAssistant) -> 
         )
 
 
+async def test_the_sdm120_is_offered_the_reset_on_a_field_trial(
+    hass: HomeAssistant,
+) -> None:
+    """The SDM120 gets the button although its manual documents no register.
+
+    Pinned deliberately. The address comes from the SDM630 document and the
+    SDM120's own table never mentions it, so this entry rests on a decision
+    rather than on paperwork -- and withdrawing it after a failed trial should
+    mean editing a test that says so, not quietly dropping a set member.
+    """
+    unit = build_unit(SdmModel.SDM120)
+    await _setup(hass, SdmModel.SDM120, unit)
+
+    writes: list[WriteEvent] = []
+    unit.on_write(writes.append)
+
+    await hass.services.async_call(
+        BUTTON_DOMAIN,
+        SERVICE_PRESS,
+        {ATTR_ENTITY_ID: "button.sdm120_1_reset_maximum_demand"},
+        blocking=True,
+    )
+
+    assert [(e.address, e.values) for e in writes] == [(0xF010, [0x0000])]
+
+
 @pytest.mark.parametrize("model", [m for m in SdmModel if m not in DEMAND_RESET_MODELS])
 async def test_no_button_where_the_register_is_undocumented(
     hass: HomeAssistant, model: SdmModel

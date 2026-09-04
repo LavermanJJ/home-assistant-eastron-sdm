@@ -116,13 +116,23 @@ BAUD_RATES: dict[int, int] = {
 DEMAND_RESET_REGISTER: int = 0xF010
 DEMAND_RESET_VALUE: int = 0x0000
 
-#: Models whose protocol document describes that register.
+#: Models that are offered the reset button, and why each one is here.
 #:
-#: The SDM630 document is the only one here that does. The SDM120's holding
-#: register table stops at 0xFC03 and never mentions 0xF010 -- so a reset is
-#: deliberately not offered on the SDM120, rather than offered as an
-#: undocumented write to a meter that may be billing someone. The SDM120CT,
-#: SDM230, SDM630MCT and both SDM72D variants are absent for a weaker reason:
-#: their documents are not in ``docs/`` to check. Add a model here once its
-#: document has been read, not because the family probably shares the address.
-DEMAND_RESET_MODELS: frozenset[SdmModel] = frozenset({SdmModel.SDM630})
+#: SDM630 -- documented. The register above is quoted from its own manual.
+#:
+#: SDM120 -- **not** documented, and enabled anyway on a deliberate decision.
+#: Its holding-register table stops at 0xFC03 and never mentions 0xF010, so
+#: the address is unknown on this model rather than merely unpublished. It is
+#: here because the SDM family shares one firmware map and the likely outcomes
+#: are that it works or that the meter answers with an illegal-data-address
+#: exception, which the button surfaces as an error and which harms nothing.
+#: The risk it accepts is the remaining one: that 0xF010 means something else
+#: on SDM120 firmware and the write succeeds at doing the wrong thing. Its
+#: neighbours in the holding space set the node address, the baud rate and the
+#: pulse output, which is why this is not a decision to take on a user's
+#: behalf. Remove this entry if a trial shows the write is not a demand reset.
+#:
+#: The SDM120CT, SDM230, SDM630MCT and both SDM72D variants are absent for a
+#: different reason again: nobody has read their documents. Move one up here
+#: once someone has, not because the family probably shares the address.
+DEMAND_RESET_MODELS: frozenset[SdmModel] = frozenset({SdmModel.SDM120, SdmModel.SDM630})
