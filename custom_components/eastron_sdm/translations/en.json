@@ -107,6 +107,9 @@
     },
     "poll_failed": {
       "message": "Error reading the meter: {error}"
+    },
+    "reset_demand_failed": {
+      "message": "Could not reset the maximum demand: {error}"
     }
   },
   "issues": {
@@ -116,6 +119,11 @@
     }
   },
   "entity": {
+    "button": {
+      "reset_demand": {
+        "name": "Reset maximum demand"
+      }
+    },
     "sensor": {
       "active_power": {
         "name": "Active power"

@@ -102,3 +102,27 @@ BAUD_RATES: dict[int, int] = {
     4: 38400,
     5: 1200,
 }
+
+#: Holding register that clears the maximum-demand readings, and the value
+#: that does it. SDM630 Modbus Protocol V1.8, quoted verbatim:
+#:   461457 30729 Reset F0 10 | "00 00: reset the Maximum demand"
+#:                            | Length: 2 byte, Data Format: Hex, wo
+#:
+#: Written with function code 16, which is what "Function code 10 to set
+#: holding parameter" names in the same documents. The note there about even
+#: start addresses and even register counts is about *floating point*
+#: parameters, which span two registers; this one is a single 2-byte Hex
+#: register, so a count of one is what it takes.
+DEMAND_RESET_REGISTER: int = 0xF010
+DEMAND_RESET_VALUE: int = 0x0000
+
+#: Models whose protocol document describes that register.
+#:
+#: The SDM630 document is the only one here that does. The SDM120's holding
+#: register table stops at 0xFC03 and never mentions 0xF010 -- so a reset is
+#: deliberately not offered on the SDM120, rather than offered as an
+#: undocumented write to a meter that may be billing someone. The SDM120CT,
+#: SDM230, SDM630MCT and both SDM72D variants are absent for a weaker reason:
+#: their documents are not in ``docs/`` to check. Add a model here once its
+#: document has been read, not because the family probably shares the address.
+DEMAND_RESET_MODELS: frozenset[SdmModel] = frozenset({SdmModel.SDM630})
