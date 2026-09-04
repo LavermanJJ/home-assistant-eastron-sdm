@@ -171,6 +171,14 @@ async def test_probe_identifies_a_known_meter_code() -> None:
     assert probe.identified
 
 
+async def test_probe_identifies_the_field_reported_sdm120_code() -> None:
+    """0x0004 selects the SDM120, so that variant is not asked for its model."""
+    probe = await async_probe(build_unit(SdmModel.SDM120, meter_code=0x0004))
+
+    assert probe.model is SdmModel.SDM120
+    assert probe.identified
+
+
 async def test_probe_leaves_an_unknown_meter_code_to_the_user() -> None:
     """An unrecognised code means "ask", not "unsupported"."""
     probe = await async_probe(build_unit(SdmModel.SDM120, meter_code=0x00FF))
@@ -240,7 +248,12 @@ def test_the_two_sdm72d_meters_are_not_interchangeable() -> None:
     assert m1 - v2 == set(), "the -M-1 measures nothing the V2 does not"
 
 
-def test_every_model_has_a_distinct_meter_code() -> None:
-    """A code must not resolve to two models, or detection is a coin toss."""
-    assert len(set(METER_CODES.values())) == len(METER_CODES)
+def test_no_meter_code_resolves_to_two_models() -> None:
+    """A code must not resolve to two models, or detection is a coin toss.
+
+    The mapping is deliberately not injective the other way: one model may
+    report several codes across firmware revisions and OEM variants, which is
+    why ``SDM120`` appears under both its documented ``0x0020`` and the
+    field-reported ``0x0004``. Only every value being a real model matters.
+    """
     assert set(METER_CODES.values()) <= set(SdmModel)

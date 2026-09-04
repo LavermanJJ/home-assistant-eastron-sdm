@@ -41,9 +41,22 @@ class SdmModel(StrEnum):
 #: The SDM120CT and SDM230 manuals document no meter code at all, so those two
 #: are never detected and always reach the model step.
 #:
+#: 0x0004 is a field report too, from an SDM120 running software version 1.16
+#: that reports it where its own manual promises 0x0020. It is mapped despite
+#: sitting far below every documented code -- all of which are 0x20 or above --
+#: because leaving it out costs that meter automatic detection, while getting
+#: it wrong costs at most the model *name*: SDM120 and SDM120CT share one
+#: register map, and the CT documents no code of its own. A report of 0x0004
+#: from outside the SDM120 family is the one thing that would make this entry
+#: wrong, which is why its provenance is recorded here.
+#:
+#: One model may therefore appear under more than one code. The reverse must
+#: never happen: a code resolving to two models would make detection a guess.
+#:
 #: Detection is best-effort throughout: an unrecognised or missing code falls
 #: back to asking the user, it never blocks setup.
 METER_CODES: dict[int, SdmModel] = {
+    0x0004: SdmModel.SDM120,
     0x0020: SdmModel.SDM120,
     0x0070: SdmModel.SDM630,
     0x0079: SdmModel.SDM630MCT,

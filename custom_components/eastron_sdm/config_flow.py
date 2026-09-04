@@ -195,6 +195,19 @@ class SdmConfigFlow(ConfigFlow, domain=DOMAIN):
         else:
             step_id = "model_unknown_code"
             placeholders = {"meter_code": f"0x{code:04X}"}
+            # The only durable record of the code. It is otherwise quoted just
+            # in this dialog, which the user dismisses by answering it, and in
+            # a diagnostics dump nobody downloads for a flow that succeeded --
+            # so without this line every field report starts by asking the user
+            # to reproduce a form they have already got past.
+            _LOGGER.warning(
+                "Meter on unit %s reported unrecognised meter code 0x%04X. "
+                "Setup continues with the model you choose; please report that "
+                "code together with the model printed on the meter, so it can "
+                "be detected automatically",
+                self._data.get(CONF_UNIT_ID),
+                code,
+            )
 
         schema = vol.Schema(
             {

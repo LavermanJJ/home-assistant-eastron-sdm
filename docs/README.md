@@ -51,6 +51,15 @@ links above are the ones served directly.
   is **not** documented — V1.8 lists only the serial number — and the value in
   `sdm/const.py` comes from field reports. The SDM120CT and SDM230 manuals
   document no meter code, so those two always reach the model-selection step.
+- **Not every SDM120 reports `0x0020`.** One running software version 1.16 was
+  observed reporting `0x0004`, out of the same four-register block that
+  returned a correct serial number and firmware version, and it reads correctly
+  on the SDM120 map. `0x0004` is mapped to the SDM120 on that single report. It
+  sits well below the `0x20`-and-above range every documented code occupies, so
+  treat it as provisional: a meter outside the SDM120 family reporting it is
+  what would make the mapping wrong. The stakes on the map itself are low —
+  SDM120 and SDM120CT share one register map, so confusing those two costs only
+  the name shown on the device page.
 
 ## Reading across undocumented addresses
 
