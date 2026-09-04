@@ -41,6 +41,10 @@ class SdmModel(StrEnum):
 #: The SDM120CT and SDM230 manuals document no meter code at all, so those two
 #: are never detected and always reach the model step.
 #:
+#: A code in here configures a meter unattended, so it must be one the
+#: hardware cannot contradict. Provisional codes belong in
+#: ``PROVISIONAL_METER_CODES`` instead.
+#:
 #: Detection is best-effort throughout: an unrecognised or missing code falls
 #: back to asking the user, it never blocks setup.
 METER_CODES: dict[int, SdmModel] = {
@@ -49,6 +53,31 @@ METER_CODES: dict[int, SdmModel] = {
     0x0079: SdmModel.SDM630MCT,
     0x0084: SdmModel.SDM72D_M_1,
     0x0089: SdmModel.SDM72DM_V2,
+}
+
+#: Codes seen in the field that name a model without proving it. They
+#: preselect on the model step; they never decide on their own.
+#:
+#: 0x0004 was reported by an SDM120 on software version 1.16, out of the same
+#: four-register read that returned a correct serial number and firmware, and
+#: that meter reads correctly on the SDM120 map. It is kept out of
+#: ``METER_CODES`` because a documented code is a promise the manual makes and
+#: this is one meter's word: it sits far below the 0x20-and-above range every
+#: documented code occupies, which is a hint that whatever populates it here is
+#: not the field the manual describes.
+#:
+#: The models that could collide are exactly the ones that cannot be ruled out.
+#: The SDM120CT would be harmless -- it shares the SDM120 register map -- but
+#: the SDM230 does not, and the SDM230 and SDM120CT are precisely the two
+#: models whose manuals document no meter code at all, so nothing says what
+#: their 0xFC02 holds. Auto-configuring on 0x0004 would put an SDM230 on the
+#: SDM120 map, reading every value from the wrong address into a plausible
+#: number, and would raise a permanent mismatch repair issue against an SDM230
+#: entry its owner had set up correctly by hand.
+#:
+#: Preselecting costs that user one confirmation and can be wrong out loud.
+PROVISIONAL_METER_CODES: dict[int, SdmModel] = {
+    0x0004: SdmModel.SDM120,
 }
 
 #: Values of the ``Network Parity Stop`` holding register (``0x0012``), which

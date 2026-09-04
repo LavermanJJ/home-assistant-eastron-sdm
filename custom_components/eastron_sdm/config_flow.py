@@ -65,7 +65,14 @@ from .const import (
     PARITIES,
     STOPBITS,
 )
-from .sdm import SdmModel, SdmProbe, async_ping, async_probe, contradicting_model
+from .sdm import (
+    SdmModel,
+    SdmProbe,
+    async_ping,
+    async_probe,
+    contradicting_model,
+    provisional_model,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -153,7 +160,7 @@ class SdmConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         """Ask which model this is, when the meter's answer is not enough.
 
-        Three situations reach here and they read very differently to a user,
+        Four situations reach here and they read very differently to a user,
         so each gets its own wording through its own step id.
 
         A meter that reports no code at all is the documented, expected path
@@ -162,12 +169,13 @@ class SdmConfigFlow(ConfigFlow, domain=DOMAIN):
         integration does not recognise" would describe correct hardware as a
         fault. A meter that reports a code this integration does not know is
         the genuinely unexpected one, and worth quoting the code back. A meter
-        that contradicts the model an existing entry is set to is the third:
-        only reachable from a reconfigure, and the one case where there is a
-        sensible answer to preselect.
+        reporting a code seen in the field but not in any manual is the third,
+        and gets that report offered as a preselection. A meter that
+        contradicts the model an existing entry is set to is the fourth: only
+        reachable from a reconfigure.
 
-        None of the three is a failure: the register maps are per model and
-        the user knows which meter they wired.
+        None of the four is a failure: the register maps are per model and the
+        user knows which meter they wired.
         """
         if user_input is not None:
             self._data[CONF_MODEL] = user_input[CONF_MODEL]
@@ -192,9 +200,32 @@ class SdmConfigFlow(ConfigFlow, domain=DOMAIN):
         elif code is None:
             step_id = "model"
             placeholders = {}
+        elif (suggested := provisional_model(code)) is not None:
+            # Seen in the field on this model, but no manual says so. Offered,
+            # never applied: a code that decides on its own has to be one the
+            # hardware cannot contradict, and this one is a single report.
+            detected = suggested
+            step_id = "model_provisional_code"
+            placeholders = {
+                "meter_code": f"0x{code:04X}",
+                "detected": str(suggested),
+            }
         else:
             step_id = "model_unknown_code"
             placeholders = {"meter_code": f"0x{code:04X}"}
+            # The only durable record of the code. It is otherwise quoted just
+            # in this dialog, which the user dismisses by answering it, and in
+            # a diagnostics dump nobody downloads for a flow that succeeded --
+            # so without this line every field report starts by asking the user
+            # to reproduce a form they have already got past.
+            _LOGGER.warning(
+                "Meter on unit %s reported unrecognised meter code 0x%04X. "
+                "Setup continues with the model you choose; please report that "
+                "code together with the model printed on the meter, so it can "
+                "be detected automatically",
+                self._data.get(CONF_UNIT_ID),
+                code,
+            )
 
         schema = vol.Schema(
             {
@@ -230,6 +261,16 @@ class SdmConfigFlow(ConfigFlow, domain=DOMAIN):
 
         Same question and same handling; it exists so that variant can carry
         its own wording, which is keyed by step id.
+        """
+        return await self.async_step_model(user_input)
+
+    async def async_step_model_provisional_code(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Handle the model step for a code seen in the field but undocumented.
+
+        Same question and same handling, its own wording; see
+        ``async_step_model``.
         """
         return await self.async_step_model(user_input)
 
@@ -441,7 +482,16 @@ class SdmConfigFlow(ConfigFlow, domain=DOMAIN):
                 # and simply does not serve 0xFC00, which the SDM630 V1.8
                 # document never promised. Confirm it is alive on a block
                 # every model documents, then let the user name the model.
-                await async_ping(unit)
+                if await async_ping(unit) is None:
+                    # Something is at this address, but it did not answer the
+                    # one block every SDM documents with anything an SDM could
+                    # report. Refusing both blocks is what a device of another
+                    # make looks like -- most often a unit ID typed wrong --
+                    # and offering to set it up as a meter would hand the user
+                    # an entry whose every reading is decoded from registers
+                    # that mean something else. Re-raising puts them back on
+                    # the form with "cannot connect", which is the truth.
+                    raise
                 return SdmProbe(
                     serial_number=None,
                     meter_code=None,

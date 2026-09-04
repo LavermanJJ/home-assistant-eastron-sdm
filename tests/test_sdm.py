@@ -8,12 +8,16 @@ import pytest
 from custom_components.eastron_sdm.sdm import (
     MEASUREMENTS,
     METER_CODES,
+    PROVISIONAL_METER_CODES,
     SdmMeter,
     SdmModel,
+    async_ping,
     async_probe,
+    contradicting_model,
+    provisional_model,
 )
 
-from .conftest import SERIAL_NUMBER, build_unit
+from .conftest import SERIAL_NUMBER, build_unit, encode_float
 
 #: The per-request ceiling each model's protocol document states, in
 #: registers. Duplicated from the documents on purpose: asserting that a read
@@ -162,6 +166,50 @@ async def test_missing_device_info_block_does_not_break_setup() -> None:
     assert meter.value("voltage_l1") == pytest.approx(1)
 
 
+async def test_non_finite_link_settings_do_not_break_setup() -> None:
+    """Garbage in the network block must not escape setup as a traceback.
+
+    A device that is not an SDM -- another make answering a unit ID typed by
+    mistake -- can leave any bit pattern in those three floats. NaN and
+    infinity both make a bare ``int()`` raise, and neither exception is a
+    ``ModbusError``, so one would escape ``async_setup`` past every handler
+    written for a meter that does not answer.
+    """
+    unit = build_unit(SdmModel.SDM120)
+    unit.holding[0x0012] = encode_float(float("inf"))
+    unit.holding[0x0014] = encode_float(float("nan"))
+    unit.holding[0x001C] = encode_float(float("-inf"))
+
+    meter = SdmMeter(unit, SdmModel.SDM120)
+    await meter.async_setup()
+
+    assert meter.info.node_address is None
+    assert meter.info.baud_rate is None
+    assert (meter.info.parity, meter.info.stopbits) == (None, None)
+    # The identity block is a separate read and is unaffected by the garbage.
+    assert meter.info.serial_number == SERIAL_NUMBER
+
+
+@pytest.mark.parametrize("node", [float("nan"), float("inf"), 0.0, 248.0, -1.0])
+async def test_ping_rejects_a_node_address_no_sdm_could_report(node: float) -> None:
+    """``async_ping`` must not vouch for a device answering nonsense.
+
+    Every SDM documents this register and every one reports 1..247 in it, so
+    anything else is evidence that whatever is at this address is a different
+    device. Answering "yes, a meter" would hand the user an entry decoding
+    every reading from registers that mean something else on that hardware.
+    """
+    unit = build_unit(SdmModel.SDM120)
+    unit.holding[0x0014] = encode_float(node)
+
+    assert await async_ping(unit) is None
+
+
+async def test_ping_accepts_a_real_node_address() -> None:
+    """A meter answering the documented block is confirmed alive."""
+    assert await async_ping(build_unit(SdmModel.SDM120)) == 1
+
+
 async def test_probe_identifies_a_known_meter_code() -> None:
     """The documented SDM120 meter code selects the model."""
     probe = await async_probe(build_unit(SdmModel.SDM120, meter_code=0x0020))
@@ -169,6 +217,39 @@ async def test_probe_identifies_a_known_meter_code() -> None:
     assert probe.model is SdmModel.SDM120
     assert probe.serial_number == SERIAL_NUMBER
     assert probe.identified
+
+
+async def test_a_provisional_code_does_not_configure_on_its_own() -> None:
+    """0x0004 must reach the user, not decide.
+
+    Probing has to leave ``model`` unset or the config flow skips the model
+    step entirely, configuring on one field report a meter whose own manual
+    documents a different code. The SDM230 is the reason: its manual documents
+    no meter code at all, so nothing rules out an SDM230 reporting 0x0004, and
+    it does not share the SDM120 register map.
+    """
+    probe = await async_probe(build_unit(SdmModel.SDM120, meter_code=0x0004))
+
+    assert probe.model is None
+    assert not probe.identified
+    assert provisional_model(probe.meter_code) is SdmModel.SDM120
+
+
+def test_provisional_codes_stay_out_of_the_deciding_table() -> None:
+    """The two tables must not overlap, or a provisional code would decide."""
+    assert not set(PROVISIONAL_METER_CODES) & set(METER_CODES)
+    assert set(PROVISIONAL_METER_CODES.values()) <= set(MEASUREMENTS)
+
+
+def test_a_contradiction_is_never_raised_from_a_provisional_code() -> None:
+    """A provisional code must not accuse a correct entry of being wrong.
+
+    ``0x0004`` on an entry the user set up as an SDM230 by hand would raise a
+    permanent mismatch repair issue against hardware that is configured right,
+    which is the cost of letting an unverified code into ``METER_CODES``.
+    """
+    for model in SdmModel:
+        assert contradicting_model(0x0004, model) is None
 
 
 async def test_probe_leaves_an_unknown_meter_code_to_the_user() -> None:
@@ -240,7 +321,15 @@ def test_the_two_sdm72d_meters_are_not_interchangeable() -> None:
     assert m1 - v2 == set(), "the -M-1 measures nothing the V2 does not"
 
 
-def test_every_model_has_a_distinct_meter_code() -> None:
-    """A code must not resolve to two models, or detection is a coin toss."""
-    assert len(set(METER_CODES.values())) == len(METER_CODES)
-    assert set(METER_CODES.values()) <= set(SdmModel)
+def test_no_meter_code_resolves_to_two_models() -> None:
+    """A code must not resolve to two models, or detection is a coin toss.
+
+    The mapping is deliberately not injective the other way: one model may
+    report several codes across firmware revisions and OEM variants, which is
+    why ``SDM120`` appears under both its documented ``0x0020`` and the
+    field-reported ``0x0004``. Only every value being a real model matters.
+    """
+    # `<= set(SdmModel)` would restate the dict annotation and prove nothing.
+    # Every value having a register map is the real load: `contradicting_model`
+    # indexes MEASUREMENTS with whatever comes out of here, unguarded.
+    assert set(METER_CODES.values()) <= set(MEASUREMENTS)

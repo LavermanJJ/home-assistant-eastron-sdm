@@ -3,12 +3,19 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import isfinite
 from typing import TYPE_CHECKING, cast
 
 from modbus_connection import ModbusError
 from modbus_connection.model import Component
 
-from .const import BAUD_RATES, METER_CODES, PARITY_STOP, SdmModel
+from .const import (
+    BAUD_RATES,
+    METER_CODES,
+    PARITY_STOP,
+    PROVISIONAL_METER_CODES,
+    SdmModel,
+)
 from .identity import SdmDeviceInfo, SdmNetworkSettings
 from .sdm72d import Sdm72dMeasurements, Sdm72dmV2Measurements
 from .sdm120 import Sdm120Measurements
@@ -34,6 +41,38 @@ MEASUREMENTS: dict[SdmModel, type[Component]] = {
     SdmModel.SDM72D_M_1: Sdm72dMeasurements,
     SdmModel.SDM72DM_V2: Sdm72dmV2Measurements,
 }
+
+
+def _as_int(value: float | None) -> int | None:
+    """Return ``value`` as an ``int``, or ``None`` if it is not a usable number.
+
+    The network-settings block is three floats, and nothing guarantees they
+    hold what this library expects. A device that is not an SDM at all -- a
+    meter of another make answering a unit ID the user typed by mistake -- can
+    leave any bit pattern there, and the ones that decode to NaN or infinity
+    make a bare ``int()`` raise ``ValueError`` or ``OverflowError``.
+
+    Neither is a ``ModbusError``, so neither is caught by the handlers that
+    exist for a meter that does not answer. Without this the exception escapes
+    ``SdmMeter.async_setup`` -- documented at its call site as never raising --
+    and the user gets a traceback and "unknown error occurred" where they
+    should get the clean "nothing usable is at this address" path.
+    """
+    if value is None or not isfinite(value):
+        return None
+    return int(value)
+
+
+def provisional_model(code: int | None) -> SdmModel | None:
+    """Return the model a field-reported ``code`` suggests, if any.
+
+    Only ever a suggestion to put in front of the user. Deliberately separate
+    from ``METER_CODES``, which decides on its own -- see the comment on
+    ``PROVISIONAL_METER_CODES`` for why 0x0004 is not trusted that far.
+    """
+    if code is None:
+        return None
+    return PROVISIONAL_METER_CODES.get(code)
 
 
 def contradicting_model(code: int | None, configured: SdmModel) -> SdmModel | None:
@@ -144,12 +183,11 @@ class SdmMeter:
         except ModbusError:
             pass
         else:
-            if (node := self.network.node_address) is not None:
-                node_address = int(node)
-            if (baud := self.network.baud_rate) is not None:
-                baud_rate = BAUD_RATES.get(int(baud))
-            if (encoded := self.network.parity_stop) is not None:
-                parity, stopbits = PARITY_STOP.get(int(encoded), (None, None))
+            node_address = _as_int(self.network.node_address)
+            if (baud := _as_int(self.network.baud_rate)) is not None:
+                baud_rate = BAUD_RATES.get(baud)
+            if (encoded := _as_int(self.network.parity_stop)) is not None:
+                parity, stopbits = PARITY_STOP.get(encoded, (None, None))
 
         return SdmInfo(
             model=model,
@@ -205,8 +243,17 @@ async def async_ping(unit: ModbusUnit) -> int | None:
     ``0xFC00`` device-info block, so this answers "is a meter there?" for a
     meter that ``async_probe`` could not identify. Raises the underlying
     ``ModbusError`` when nothing answers.
+
+    ``None`` means something answered but did not answer like an SDM. Every
+    model documents this register and every model reports 1..247 in it, so a
+    value outside that -- or one that is not a number at all -- is positive
+    evidence that whatever is at this address is a different device, not a
+    meter this library should go on to set up. Callers are expected to treat
+    it as "nothing usable here" rather than as a missing detail.
     """
     network = SdmNetworkSettings(unit)
     await network.async_update()
-    node = network.node_address
-    return int(node) if node is not None else None
+    node = _as_int(network.node_address)
+    if node is None or not 1 <= node <= 247:
+        return None
+    return node

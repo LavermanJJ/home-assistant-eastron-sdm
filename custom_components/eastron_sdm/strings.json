@@ -51,6 +51,13 @@
           "model": "Model"
         }
       },
+      "model_provisional_code": {
+        "title": "Which meter is this?",
+        "description": "The meter reported model code {meter_code}. No manual documents that code, but it has been reported before from a {detected}, which is preselected. Confirm it if that is what you wired, or choose the right model — the register map depends on it.",
+        "data": {
+          "model": "Model"
+        }
+      },
       "model_mismatch": {
         "title": "Which meter is this?",
         "description": "This entry is set to {configured}, but the meter reports code {meter_code} — the code for {detected}. The two have different register maps, so only one of them reads this meter correctly. {detected} is preselected; keep {configured} if you know the reported code is wrong.",

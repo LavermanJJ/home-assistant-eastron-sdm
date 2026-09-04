@@ -19,5 +19,5 @@
     "modbus-connection>=4.10.0,<5",
     "pyserial>=3.5"
   ],
-  "version": "0.1.0"
+  "version": "0.1.1"
 }

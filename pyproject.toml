@@ -1,6 +1,6 @@
 [project]
 name = "home-assistant-eastron-sdm"
-version = "0.1.0"
+version = "0.1.1"
 description = "Home Assistant integration for Eastron SDM energy meters over Modbus"
 readme = "README.md"
 requires-python = ">=3.14"

@@ -51,6 +51,13 @@
           "model": "Modell"
         }
       },
+      "model_provisional_code": {
+        "title": "Um welchen Zähler handelt es sich?",
+        "description": "Der Zähler meldet Code {meter_code}. Kein Handbuch dokumentiert diesen Code, er wurde aber schon einmal von einem {detected} gemeldet, der deshalb vorausgewählt ist. Bestätige ihn, wenn du das verbaut hast, oder wähle das richtige Modell — die Registerbelegung hängt davon ab.",
+        "data": {
+          "model": "Modell"
+        }
+      },
       "model_mismatch": {
         "title": "Um welchen Zähler handelt es sich?",
         "description": "Dieser Eintrag ist auf {configured} gesetzt, der Zähler meldet aber Code {meter_code} – den Code für {detected}. Die beiden haben unterschiedliche Registerbelegungen, nur eine davon liest diesen Zähler richtig. {detected} ist vorausgewählt; behalte {configured}, wenn du weißt, dass der gemeldete Code falsch ist.",
