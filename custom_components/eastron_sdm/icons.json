@@ -22,8 +22,59 @@
       "current_thd_l3": {
         "default": "mdi:sine-wave"
       },
+      "export_active_energy": {
+        "default": "mdi:meter-electric"
+      },
+      "export_active_energy_l1": {
+        "default": "mdi:meter-electric"
+      },
+      "export_active_energy_l2": {
+        "default": "mdi:meter-electric"
+      },
+      "export_active_energy_l3": {
+        "default": "mdi:meter-electric"
+      },
+      "export_reactive_energy": {
+        "default": "mdi:meter-electric-outline"
+      },
+      "export_reactive_energy_l1": {
+        "default": "mdi:meter-electric-outline"
+      },
+      "export_reactive_energy_l2": {
+        "default": "mdi:meter-electric-outline"
+      },
+      "export_reactive_energy_l3": {
+        "default": "mdi:meter-electric-outline"
+      },
+      "import_active_energy": {
+        "default": "mdi:meter-electric"
+      },
+      "import_active_energy_l1": {
+        "default": "mdi:meter-electric"
+      },
+      "import_active_energy_l2": {
+        "default": "mdi:meter-electric"
+      },
+      "import_active_energy_l3": {
+        "default": "mdi:meter-electric"
+      },
+      "import_reactive_energy": {
+        "default": "mdi:meter-electric-outline"
+      },
+      "import_reactive_energy_l1": {
+        "default": "mdi:meter-electric-outline"
+      },
+      "import_reactive_energy_l2": {
+        "default": "mdi:meter-electric-outline"
+      },
+      "import_reactive_energy_l3": {
+        "default": "mdi:meter-electric-outline"
+      },
       "line_settings": {
         "default": "mdi:tune"
+      },
+      "net_active_energy": {
+        "default": "mdi:meter-electric"
       },
       "node_address": {
         "default": "mdi:identifier"
@@ -40,11 +91,53 @@
       "phase_angle_l3": {
         "default": "mdi:angle-acute"
       },
+      "resettable_export_active_energy": {
+        "default": "mdi:meter-electric"
+      },
+      "resettable_export_reactive_energy": {
+        "default": "mdi:meter-electric-outline"
+      },
+      "resettable_import_active_energy": {
+        "default": "mdi:meter-electric"
+      },
+      "resettable_import_reactive_energy": {
+        "default": "mdi:meter-electric-outline"
+      },
+      "resettable_total_active_energy": {
+        "default": "mdi:meter-electric"
+      },
+      "resettable_total_reactive_energy": {
+        "default": "mdi:meter-electric-outline"
+      },
+      "total_active_energy": {
+        "default": "mdi:meter-electric"
+      },
+      "total_active_energy_l1": {
+        "default": "mdi:meter-electric"
+      },
+      "total_active_energy_l2": {
+        "default": "mdi:meter-electric"
+      },
+      "total_active_energy_l3": {
+        "default": "mdi:meter-electric"
+      },
       "total_ampere_hours": {
         "default": "mdi:current-ac"
       },
       "total_apparent_energy": {
-        "default": "mdi:flash-outline"
+        "default": "mdi:meter-electric-outline"
+      },
+      "total_reactive_energy": {
+        "default": "mdi:meter-electric-outline"
+      },
+      "total_reactive_energy_l1": {
+        "default": "mdi:meter-electric-outline"
+      },
+      "total_reactive_energy_l2": {
+        "default": "mdi:meter-electric-outline"
+      },
+      "total_reactive_energy_l3": {
+        "default": "mdi:meter-electric-outline"
       },
       "total_system_phase_angle": {
         "default": "mdi:angle-acute"
