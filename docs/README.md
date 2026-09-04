@@ -71,6 +71,26 @@ links above are the ones served directly.
   it, and only if no model outside the SDM120 family has been seen reporting
   it.
 
+- **The maximum-demand reset lives at `0xF010`.** SDM630 Modbus Protocol V1.8
+  documents it as `461457 / 30729 Reset F0 10`, write-only, 2-byte Hex, where
+  `00 00` resets the maximum demand. Written with function code 16 — "Function
+  code 10 to set holding parameter" in these documents is FC16, and the note
+  about even start addresses and even register counts applies to floating-point
+  parameters spanning two registers, not to a single Hex register.
+
+  **The SDM120 does not document it but does implement it**, verified on
+  software version 1.16: the write was accepted and the next poll read the
+  maxima as zero, while `active_power` was undisturbed and
+  `import_active_energy` carried on across the reset with no step. The node
+  address, baud rate and parity were re-read afterwards and unchanged — worth
+  checking on any model added here, since those are `0xF010`'s neighbours.
+
+  The reset also zeroes the *live* demand accumulators, not just their maxima,
+  so the demand period restarts. The SDM630 manual does not say so outright.
+
+  The SDM120CT, SDM230, SDM630MCT and both SDM72D variants are not offered a
+  reset, purely because nobody has read their documents.
+
 ## Reading across undocumented addresses
 
 Declaring a `register_ranges` entry tells the planner it may merge reads across
