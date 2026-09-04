@@ -9,7 +9,13 @@ from typing import TYPE_CHECKING, cast
 from modbus_connection import ModbusError
 from modbus_connection.model import Component
 
-from .const import BAUD_RATES, METER_CODES, PARITY_STOP, SdmModel
+from .const import (
+    BAUD_RATES,
+    METER_CODES,
+    PARITY_STOP,
+    PROVISIONAL_METER_CODES,
+    SdmModel,
+)
 from .identity import SdmDeviceInfo, SdmNetworkSettings
 from .sdm72d import Sdm72dMeasurements, Sdm72dmV2Measurements
 from .sdm120 import Sdm120Measurements
@@ -55,6 +61,18 @@ def _as_int(value: float | None) -> int | None:
     if value is None or not isfinite(value):
         return None
     return int(value)
+
+
+def provisional_model(code: int | None) -> SdmModel | None:
+    """Return the model a field-reported ``code`` suggests, if any.
+
+    Only ever a suggestion to put in front of the user. Deliberately separate
+    from ``METER_CODES``, which decides on its own -- see the comment on
+    ``PROVISIONAL_METER_CODES`` for why 0x0004 is not trusted that far.
+    """
+    if code is None:
+        return None
+    return PROVISIONAL_METER_CODES.get(code)
 
 
 def contradicting_model(code: int | None, configured: SdmModel) -> SdmModel | None:
@@ -225,7 +243,17 @@ async def async_ping(unit: ModbusUnit) -> int | None:
     ``0xFC00`` device-info block, so this answers "is a meter there?" for a
     meter that ``async_probe`` could not identify. Raises the underlying
     ``ModbusError`` when nothing answers.
+
+    ``None`` means something answered but did not answer like an SDM. Every
+    model documents this register and every model reports 1..247 in it, so a
+    value outside that -- or one that is not a number at all -- is positive
+    evidence that whatever is at this address is a different device, not a
+    meter this library should go on to set up. Callers are expected to treat
+    it as "nothing usable here" rather than as a missing detail.
     """
     network = SdmNetworkSettings(unit)
     await network.async_update()
-    return _as_int(network.node_address)
+    node = _as_int(network.node_address)
+    if node is None or not 1 <= node <= 247:
+        return None
+    return node

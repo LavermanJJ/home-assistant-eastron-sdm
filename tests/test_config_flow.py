@@ -40,7 +40,7 @@ from custom_components.eastron_sdm.const import (
 )
 from custom_components.eastron_sdm.sdm import SdmModel
 
-from .conftest import SERIAL_DATA, SERIAL_NUMBER, build_unit
+from .conftest import SERIAL_DATA, SERIAL_NUMBER, build_unit, encode_float
 
 SERIAL_INPUT = {
     CONF_DEVICE: "/dev/ttyUSB0",
@@ -153,6 +153,57 @@ async def test_unknown_meter_code_asks_for_the_model(hass: HomeAssistant) -> Non
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["data"][CONF_MODEL] == SdmModel.SDM630
+
+
+async def test_provisional_meter_code_preselects_but_still_asks(
+    hass: HomeAssistant,
+) -> None:
+    """0x0004 offers the SDM120 and waits for the user to agree.
+
+    Skipping the step would configure an SDM230 -- a model whose manual
+    documents no meter code, so nothing rules it out of reporting 0x0004 -- on
+    the SDM120 register map, silently.
+    """
+    flow_id = await _start_serial(hass)
+    with serving(build_unit(meter_code=0x0004)):
+        result = await hass.config_entries.flow.async_configure(flow_id, SERIAL_INPUT)
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "model_provisional_code"
+    assert result["description_placeholders"] == {
+        "meter_code": "0x0004",
+        "detected": "SDM120",
+    }
+
+    # Offered, not applied, so overriding it has to be possible.
+    result = await hass.config_entries.flow.async_configure(
+        flow_id, {CONF_MODEL: SdmModel.SDM230}
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_MODEL] == SdmModel.SDM230
+
+
+async def test_a_foreign_device_is_not_offered_as_a_meter(
+    hass: HomeAssistant,
+) -> None:
+    """Another vendor's device on a mistyped unit ID must fail, not set up.
+
+    It refuses 0xFC00 the way an SDM630 legitimately does, but answers the
+    block every SDM documents with a value no SDM could report. Setting it up
+    would hand the user an entry decoding every reading from registers that
+    mean something else on that hardware.
+    """
+    unit = build_unit(SdmModel.SDM120)
+    unit.fail_read(0xFC00, IllegalDataAddressError(), register_type="holding")
+    unit.holding[0x0014] = encode_float(float("nan"))
+
+    flow_id = await _start_serial(hass)
+    with serving(unit):
+        result = await hass.config_entries.flow.async_configure(flow_id, SERIAL_INPUT)
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == CONNECTION_SERIAL
+    assert result["errors"] == {"base": "cannot_connect"}
 
 
 async def test_meter_without_device_info_block_still_sets_up(

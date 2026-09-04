@@ -14,7 +14,7 @@ or a meter that speaks Modbus TCP natively).
 
 | Model | Phases | Entities | Per-request limit | Auto-detected |
 |---|---|---|---|---|
-| SDM120 | 1 | 21 | 80 registers | yes (`0x0020`) |
+| SDM120 | 1 | 21 | 80 registers | yes (`0x0020`); `0x0004` preselects |
 | SDM120CT | 1 | 21 | 80 registers | no — pick the model |
 | SDM230 | 1 | 22 | 80 registers | no — pick the model |
 | SDM630 | 3 | 85 | 80 registers | yes (`0x0070`, unofficial) |

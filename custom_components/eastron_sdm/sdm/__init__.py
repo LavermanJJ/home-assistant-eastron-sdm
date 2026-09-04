@@ -12,7 +12,13 @@ section each map came from.
 
 from __future__ import annotations
 
-from .const import BAUD_RATES, METER_CODES, PARITY_STOP, SdmModel
+from .const import (
+    BAUD_RATES,
+    METER_CODES,
+    PARITY_STOP,
+    PROVISIONAL_METER_CODES,
+    SdmModel,
+)
 from .meter import (
     MEASUREMENTS,
     SdmInfo,
@@ -21,6 +27,7 @@ from .meter import (
     async_ping,
     async_probe,
     contradicting_model,
+    provisional_model,
 )
 
 __all__ = [
@@ -28,6 +35,7 @@ __all__ = [
     "MEASUREMENTS",
     "METER_CODES",
     "PARITY_STOP",
+    "PROVISIONAL_METER_CODES",
     "SdmInfo",
     "SdmMeter",
     "SdmModel",
@@ -35,4 +43,5 @@ __all__ = [
     "async_ping",
     "async_probe",
     "contradicting_model",
+    "provisional_model",
 ]
