@@ -120,17 +120,24 @@ DEMAND_RESET_VALUE: int = 0x0000
 #:
 #: SDM630 -- documented. The register above is quoted from its own manual.
 #:
-#: SDM120 -- **not** documented, and enabled anyway on a deliberate decision.
-#: Its holding-register table stops at 0xFC03 and never mentions 0xF010, so
-#: the address is unknown on this model rather than merely unpublished. It is
-#: here because the SDM family shares one firmware map and the likely outcomes
-#: are that it works or that the meter answers with an illegal-data-address
-#: exception, which the button surfaces as an error and which harms nothing.
-#: The risk it accepts is the remaining one: that 0xF010 means something else
-#: on SDM120 firmware and the write succeeds at doing the wrong thing. Its
-#: neighbours in the holding space set the node address, the baud rate and the
-#: pulse output, which is why this is not a decision to take on a user's
-#: behalf. Remove this entry if a trial shows the write is not a demand reset.
+#: SDM120 -- not documented, but **verified on hardware**. Its own
+#: holding-register table stops at 0xFC03 and never mentions 0xF010, so this
+#: rests on a measurement rather than on the manual. On software version 1.16
+#: the write was accepted, and thirteen seconds later the next poll read:
+#:
+#:   maximum total / import system power demand  75.97 W -> 0.0
+#:   maximum current demand                      0.3297 A -> 0.0
+#:
+#: while ``active_power`` carried on undisturbed and ``import_active_energy``
+#: kept climbing across the reset without a step -- 0.028 to 0.033 kWh over
+#: four minutes, which is the 75 W the power register was reading at the time.
+#: The node address, baud rate and parity were re-read from the meter after
+#: the press and were unchanged, which matters because those are 0xF010's
+#: neighbours in the holding space.
+#:
+#: Note it also zeroes the *live* demand accumulators, not only their maxima,
+#: so the demand period restarts. That follows from a maximum being derived
+#: from the accumulator, and the SDM630 manual does not say it outright.
 #:
 #: The SDM120CT, SDM230, SDM630MCT and both SDM72D variants are absent for a
 #: different reason again: nobody has read their documents. Move one up here

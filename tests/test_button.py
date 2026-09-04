@@ -89,15 +89,14 @@ async def test_a_failed_write_is_reported_not_swallowed(hass: HomeAssistant) -> 
         )
 
 
-async def test_the_sdm120_is_offered_the_reset_on_a_field_trial(
-    hass: HomeAssistant,
-) -> None:
+async def test_the_sdm120_is_offered_the_reset(hass: HomeAssistant) -> None:
     """The SDM120 gets the button although its manual documents no register.
 
-    Pinned deliberately. The address comes from the SDM630 document and the
-    SDM120's own table never mentions it, so this entry rests on a decision
-    rather than on paperwork -- and withdrawing it after a failed trial should
-    mean editing a test that says so, not quietly dropping a set member.
+    Pinned deliberately, because the SDM120's own table never mentions
+    0xF010: this entry rests on a measurement rather than on paperwork. It was
+    verified on software version 1.16, where the write cleared the maxima and
+    left the energy totals climbing without a step. See the comment on
+    ``DEMAND_RESET_MODELS`` for the readings.
     """
     unit = build_unit(SdmModel.SDM120)
     await _setup(hass, SdmModel.SDM120, unit)
