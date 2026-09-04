@@ -1,5 +1,10 @@
 {
   "entity": {
+    "button": {
+      "reset_demand": {
+        "default": "mdi:restart"
+      }
+    },
     "sensor": {
       "average_current_thd": {
         "default": "mdi:sine-wave"

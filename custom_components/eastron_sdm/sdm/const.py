@@ -102,3 +102,37 @@ BAUD_RATES: dict[int, int] = {
     4: 38400,
     5: 1200,
 }
+
+#: Holding register that clears the maximum-demand readings, and the value
+#: that does it. SDM630 Modbus Protocol V1.8, quoted verbatim:
+#:   461457 30729 Reset F0 10 | "00 00: reset the Maximum demand"
+#:                            | Length: 2 byte, Data Format: Hex, wo
+#:
+#: Written with function code 16, which is what "Function code 10 to set
+#: holding parameter" names in the same documents. The note there about even
+#: start addresses and even register counts is about *floating point*
+#: parameters, which span two registers; this one is a single 2-byte Hex
+#: register, so a count of one is what it takes.
+DEMAND_RESET_REGISTER: int = 0xF010
+DEMAND_RESET_VALUE: int = 0x0000
+
+#: Models that are offered the reset button, and why each one is here.
+#:
+#: SDM630 -- documented. The register above is quoted from its own manual.
+#:
+#: SDM120 -- **not** documented, and enabled anyway on a deliberate decision.
+#: Its holding-register table stops at 0xFC03 and never mentions 0xF010, so
+#: the address is unknown on this model rather than merely unpublished. It is
+#: here because the SDM family shares one firmware map and the likely outcomes
+#: are that it works or that the meter answers with an illegal-data-address
+#: exception, which the button surfaces as an error and which harms nothing.
+#: The risk it accepts is the remaining one: that 0xF010 means something else
+#: on SDM120 firmware and the write succeeds at doing the wrong thing. Its
+#: neighbours in the holding space set the node address, the baud rate and the
+#: pulse output, which is why this is not a decision to take on a user's
+#: behalf. Remove this entry if a trial shows the write is not a demand reset.
+#:
+#: The SDM120CT, SDM230, SDM630MCT and both SDM72D variants are absent for a
+#: different reason again: nobody has read their documents. Move one up here
+#: once someone has, not because the family probably shares the address.
+DEMAND_RESET_MODELS: frozenset[SdmModel] = frozenset({SdmModel.SDM120, SdmModel.SDM630})

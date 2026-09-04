@@ -13,7 +13,7 @@ from .const import CONF_UNIT_ID, DOMAIN
 from .coordinator import SdmConfigEntry, SdmCoordinator
 from .sdm import SdmMeter, SdmModel, contradicting_model
 
-PLATFORMS: list[Platform] = [Platform.SENSOR]
+PLATFORMS: list[Platform] = [Platform.BUTTON, Platform.SENSOR]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: SdmConfigEntry) -> bool:

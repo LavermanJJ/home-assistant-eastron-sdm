@@ -14,6 +14,9 @@ from __future__ import annotations
 
 from .const import (
     BAUD_RATES,
+    DEMAND_RESET_MODELS,
+    DEMAND_RESET_REGISTER,
+    DEMAND_RESET_VALUE,
     METER_CODES,
     PARITY_STOP,
     PROVISIONAL_METER_CODES,
@@ -32,6 +35,9 @@ from .meter import (
 
 __all__ = [
     "BAUD_RATES",
+    "DEMAND_RESET_MODELS",
+    "DEMAND_RESET_REGISTER",
+    "DEMAND_RESET_VALUE",
     "MEASUREMENTS",
     "METER_CODES",
     "PARITY_STOP",

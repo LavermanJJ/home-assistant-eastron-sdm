@@ -11,6 +11,9 @@ from modbus_connection.model import Component
 
 from .const import (
     BAUD_RATES,
+    DEMAND_RESET_MODELS,
+    DEMAND_RESET_REGISTER,
+    DEMAND_RESET_VALUE,
     METER_CODES,
     PARITY_STOP,
     PROVISIONAL_METER_CODES,
@@ -132,6 +135,12 @@ class SdmMeter:
         self.network = SdmNetworkSettings(unit)
         self.identity = SdmDeviceInfo(unit)
         self._info = SdmInfo(model=model)
+        self._unit = unit
+
+    @property
+    def supports_demand_reset(self) -> bool:
+        """Whether this model documents the maximum-demand reset register."""
+        return self.model in DEMAND_RESET_MODELS
 
     @property
     def info(self) -> SdmInfo:
@@ -161,6 +170,26 @@ class SdmMeter:
     async def async_update(self) -> None:
         """Poll every measurement register for this model."""
         await self.measurements.async_update()
+
+    async def async_reset_demand(self) -> None:
+        """Clear the meter's maximum-demand readings.
+
+        The only write this library makes. It clears derived maxima and
+        nothing else: the energy totals a meter is installed to record are in
+        separate registers this never touches, so it cannot cost anyone a
+        billing figure.
+
+        Raises ``ValueError`` on a model whose document does not describe the
+        register, which is a caller bug -- the platform is expected to have
+        asked ``supports_demand_reset`` before creating a button at all.
+        Guessing the address from a sibling model would be a write to an
+        unknown register on someone's meter.
+        """
+        if not self.supports_demand_reset:
+            raise ValueError(f"{self.model} documents no demand-reset register")
+        # write_registers, not write_register: "Function code 10 to set
+        # holding parameter" is FC16, and these meters are documented for it.
+        await self._unit.write_registers(DEMAND_RESET_REGISTER, [DEMAND_RESET_VALUE])
 
     async def _async_read_identity(self) -> SdmInfo:
         model = self.model
