@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import isfinite
 from typing import TYPE_CHECKING, cast
 
 from modbus_connection import ModbusError
@@ -34,6 +35,26 @@ MEASUREMENTS: dict[SdmModel, type[Component]] = {
     SdmModel.SDM72D_M_1: Sdm72dMeasurements,
     SdmModel.SDM72DM_V2: Sdm72dmV2Measurements,
 }
+
+
+def _as_int(value: float | None) -> int | None:
+    """Return ``value`` as an ``int``, or ``None`` if it is not a usable number.
+
+    The network-settings block is three floats, and nothing guarantees they
+    hold what this library expects. A device that is not an SDM at all -- a
+    meter of another make answering a unit ID the user typed by mistake -- can
+    leave any bit pattern there, and the ones that decode to NaN or infinity
+    make a bare ``int()`` raise ``ValueError`` or ``OverflowError``.
+
+    Neither is a ``ModbusError``, so neither is caught by the handlers that
+    exist for a meter that does not answer. Without this the exception escapes
+    ``SdmMeter.async_setup`` -- documented at its call site as never raising --
+    and the user gets a traceback and "unknown error occurred" where they
+    should get the clean "nothing usable is at this address" path.
+    """
+    if value is None or not isfinite(value):
+        return None
+    return int(value)
 
 
 def contradicting_model(code: int | None, configured: SdmModel) -> SdmModel | None:
@@ -144,12 +165,11 @@ class SdmMeter:
         except ModbusError:
             pass
         else:
-            if (node := self.network.node_address) is not None:
-                node_address = int(node)
-            if (baud := self.network.baud_rate) is not None:
-                baud_rate = BAUD_RATES.get(int(baud))
-            if (encoded := self.network.parity_stop) is not None:
-                parity, stopbits = PARITY_STOP.get(int(encoded), (None, None))
+            node_address = _as_int(self.network.node_address)
+            if (baud := _as_int(self.network.baud_rate)) is not None:
+                baud_rate = BAUD_RATES.get(baud)
+            if (encoded := _as_int(self.network.parity_stop)) is not None:
+                parity, stopbits = PARITY_STOP.get(encoded, (None, None))
 
         return SdmInfo(
             model=model,
@@ -208,5 +228,4 @@ async def async_ping(unit: ModbusUnit) -> int | None:
     """
     network = SdmNetworkSettings(unit)
     await network.async_update()
-    node = network.node_address
-    return int(node) if node is not None else None
+    return _as_int(network.node_address)

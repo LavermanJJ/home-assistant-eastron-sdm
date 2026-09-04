@@ -10,10 +10,11 @@ from custom_components.eastron_sdm.sdm import (
     METER_CODES,
     SdmMeter,
     SdmModel,
+    async_ping,
     async_probe,
 )
 
-from .conftest import SERIAL_NUMBER, build_unit
+from .conftest import SERIAL_NUMBER, build_unit, encode_float
 
 #: The per-request ceiling each model's protocol document states, in
 #: registers. Duplicated from the documents on purpose: asserting that a read
@@ -160,6 +161,38 @@ async def test_missing_device_info_block_does_not_break_setup() -> None:
 
     await meter.async_update()
     assert meter.value("voltage_l1") == pytest.approx(1)
+
+
+async def test_non_finite_link_settings_do_not_break_setup() -> None:
+    """Garbage in the network block must not escape setup as a traceback.
+
+    A device that is not an SDM -- another make answering a unit ID typed by
+    mistake -- can leave any bit pattern in those three floats. NaN and
+    infinity both make a bare ``int()`` raise, and neither exception is a
+    ``ModbusError``, so one would escape ``async_setup`` past every handler
+    written for a meter that does not answer.
+    """
+    unit = build_unit(SdmModel.SDM120)
+    unit.holding[0x0012] = encode_float(float("inf"))
+    unit.holding[0x0014] = encode_float(float("nan"))
+    unit.holding[0x001C] = encode_float(float("-inf"))
+
+    meter = SdmMeter(unit, SdmModel.SDM120)
+    await meter.async_setup()
+
+    assert meter.info.node_address is None
+    assert meter.info.baud_rate is None
+    assert (meter.info.parity, meter.info.stopbits) == (None, None)
+    # The identity block is a separate read and is unaffected by the garbage.
+    assert meter.info.serial_number == SERIAL_NUMBER
+
+
+async def test_ping_survives_a_non_finite_node_address() -> None:
+    """``async_ping`` answers "something is there" even on garbage settings."""
+    unit = build_unit(SdmModel.SDM120)
+    unit.holding[0x0014] = encode_float(float("nan"))
+
+    assert await async_ping(unit) is None
 
 
 async def test_probe_identifies_a_known_meter_code() -> None:
