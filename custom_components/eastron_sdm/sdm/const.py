@@ -76,8 +76,23 @@ METER_CODES: dict[int, SdmModel] = {
 #: entry its owner had set up correctly by hand.
 #:
 #: Preselecting costs that user one confirmation and can be wrong out loud.
+#:
+#: 0x1010 was reported by an SDM630 on software version 1.5, out of the same
+#: four-register read that returned a correct serial number and firmware, and
+#: that meter reads correctly on the SDM630 map: its line-to-line voltages are
+#: the expected sqrt(3) multiple of its line-to-neutral ones, and its neutral
+#: current is the vector sum of the two loaded phase currents. It is kept out
+#: of ``METER_CODES`` for the same reason as 0x0004 -- one meter's word, and a
+#: value nowhere near the 0x20-to-0x89 range every documented code occupies.
+#:
+#: Note this does not contradict a manual, because no manual documents the
+#: SDM630's code either: 0x0070 in ``METER_CODES`` is itself a field report.
+#: Two firmware generations now reporting values far outside the documented
+#: range is the argument for preselecting rather than deciding -- whatever
+#: 0xFC02 holds does not look stable across firmware revisions.
 PROVISIONAL_METER_CODES: dict[int, SdmModel] = {
     0x0004: SdmModel.SDM120,
+    0x1010: SdmModel.SDM630,
 }
 
 #: Values of the ``Network Parity Stop`` holding register (``0x0012``), which

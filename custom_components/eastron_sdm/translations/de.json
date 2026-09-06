@@ -123,6 +123,344 @@
       "reset_demand": {
         "name": "Maximalwerte zurücksetzen"
       }
+    },
+    "sensor": {
+      "active_power": {
+        "name": "Wirkleistung"
+      },
+      "active_power_l1": {
+        "name": "Wirkleistung L1"
+      },
+      "active_power_l2": {
+        "name": "Wirkleistung L2"
+      },
+      "active_power_l3": {
+        "name": "Wirkleistung L3"
+      },
+      "apparent_power": {
+        "name": "Scheinleistung"
+      },
+      "apparent_power_l1": {
+        "name": "Scheinleistung L1"
+      },
+      "apparent_power_l2": {
+        "name": "Scheinleistung L2"
+      },
+      "apparent_power_l3": {
+        "name": "Scheinleistung L3"
+      },
+      "average_current": {
+        "name": "Strom (Durchschnitt)"
+      },
+      "average_current_thd": {
+        "name": "Strom-THD (Durchschnitt)"
+      },
+      "average_voltage_ll": {
+        "name": "Spannung L-L (Durchschnitt)"
+      },
+      "average_voltage_ln": {
+        "name": "Spannung L-N (Durchschnitt)"
+      },
+      "average_voltage_thd_ll": {
+        "name": "Spannungs-THD L-L (Durchschnitt)"
+      },
+      "average_voltage_thd_ln": {
+        "name": "Spannungs-THD L-N (Durchschnitt)"
+      },
+      "baud_rate": {
+        "name": "Baudrate"
+      },
+      "current": {
+        "name": "Strom"
+      },
+      "current_demand": {
+        "name": "Strom (Bedarf)"
+      },
+      "current_demand_l1": {
+        "name": "Strom L1 (Bedarf)"
+      },
+      "current_demand_l2": {
+        "name": "Strom L2 (Bedarf)"
+      },
+      "current_demand_l3": {
+        "name": "Strom L3 (Bedarf)"
+      },
+      "current_l1": {
+        "name": "Strom L1"
+      },
+      "current_l2": {
+        "name": "Strom L2"
+      },
+      "current_l3": {
+        "name": "Strom L3"
+      },
+      "current_thd_l1": {
+        "name": "Strom-THD L1"
+      },
+      "current_thd_l2": {
+        "name": "Strom-THD L2"
+      },
+      "current_thd_l3": {
+        "name": "Strom-THD L3"
+      },
+      "export_active_energy": {
+        "name": "Wirkenergie Einspeisung"
+      },
+      "export_active_energy_l1": {
+        "name": "Wirkenergie Einspeisung L1"
+      },
+      "export_active_energy_l2": {
+        "name": "Wirkenergie Einspeisung L2"
+      },
+      "export_active_energy_l3": {
+        "name": "Wirkenergie Einspeisung L3"
+      },
+      "export_reactive_energy": {
+        "name": "Blindenergie Einspeisung"
+      },
+      "export_reactive_energy_l1": {
+        "name": "Blindenergie Einspeisung L1"
+      },
+      "export_reactive_energy_l2": {
+        "name": "Blindenergie Einspeisung L2"
+      },
+      "export_reactive_energy_l3": {
+        "name": "Blindenergie Einspeisung L3"
+      },
+      "export_system_power_demand": {
+        "name": "Wirkleistung Einspeisung (Bedarf)"
+      },
+      "frequency": {
+        "name": "Frequenz"
+      },
+      "import_active_energy": {
+        "name": "Wirkenergie Bezug"
+      },
+      "import_active_energy_l1": {
+        "name": "Wirkenergie Bezug L1"
+      },
+      "import_active_energy_l2": {
+        "name": "Wirkenergie Bezug L2"
+      },
+      "import_active_energy_l3": {
+        "name": "Wirkenergie Bezug L3"
+      },
+      "import_reactive_energy": {
+        "name": "Blindenergie Bezug"
+      },
+      "import_reactive_energy_l1": {
+        "name": "Blindenergie Bezug L1"
+      },
+      "import_reactive_energy_l2": {
+        "name": "Blindenergie Bezug L2"
+      },
+      "import_reactive_energy_l3": {
+        "name": "Blindenergie Bezug L3"
+      },
+      "import_system_power_demand": {
+        "name": "Wirkleistung Bezug (Bedarf)"
+      },
+      "line_settings": {
+        "name": "Leitungseinstellungen"
+      },
+      "maximum_current_demand": {
+        "name": "Strom (Bedarf, Maximum)"
+      },
+      "maximum_current_demand_l1": {
+        "name": "Strom L1 (Bedarf, Maximum)"
+      },
+      "maximum_current_demand_l2": {
+        "name": "Strom L2 (Bedarf, Maximum)"
+      },
+      "maximum_current_demand_l3": {
+        "name": "Strom L3 (Bedarf, Maximum)"
+      },
+      "maximum_export_system_power_demand": {
+        "name": "Wirkleistung Einspeisung (Bedarf, Maximum)"
+      },
+      "maximum_import_system_power_demand": {
+        "name": "Wirkleistung Bezug (Bedarf, Maximum)"
+      },
+      "maximum_neutral_current_demand": {
+        "name": "Neutralleiterstrom (Bedarf, Maximum)"
+      },
+      "maximum_total_system_apparent_power_demand": {
+        "name": "Gesamtscheinleistung (Bedarf, Maximum)"
+      },
+      "maximum_total_system_power_demand": {
+        "name": "Gesamtwirkleistung (Bedarf, Maximum)"
+      },
+      "maximum_total_system_reactive_power_demand": {
+        "name": "Gesamtblindleistung (Bedarf, Maximum)"
+      },
+      "net_active_energy": {
+        "name": "Wirkenergie netto"
+      },
+      "neutral_current": {
+        "name": "Neutralleiterstrom"
+      },
+      "neutral_current_demand": {
+        "name": "Neutralleiterstrom (Bedarf)"
+      },
+      "node_address": {
+        "name": "Modbus-Adresse"
+      },
+      "phase_angle": {
+        "name": "Phasenwinkel"
+      },
+      "phase_angle_l1": {
+        "name": "Phasenwinkel L1"
+      },
+      "phase_angle_l2": {
+        "name": "Phasenwinkel L2"
+      },
+      "phase_angle_l3": {
+        "name": "Phasenwinkel L3"
+      },
+      "power_factor": {
+        "name": "Leistungsfaktor"
+      },
+      "power_factor_l1": {
+        "name": "Leistungsfaktor L1"
+      },
+      "power_factor_l2": {
+        "name": "Leistungsfaktor L2"
+      },
+      "power_factor_l3": {
+        "name": "Leistungsfaktor L3"
+      },
+      "reactive_power": {
+        "name": "Blindleistung"
+      },
+      "reactive_power_l1": {
+        "name": "Blindleistung L1"
+      },
+      "reactive_power_l2": {
+        "name": "Blindleistung L2"
+      },
+      "reactive_power_l3": {
+        "name": "Blindleistung L3"
+      },
+      "resettable_export_active_energy": {
+        "name": "Wirkenergie Einspeisung (rücksetzbar)"
+      },
+      "resettable_export_reactive_energy": {
+        "name": "Blindenergie Einspeisung (rücksetzbar)"
+      },
+      "resettable_import_active_energy": {
+        "name": "Wirkenergie Bezug (rücksetzbar)"
+      },
+      "resettable_import_reactive_energy": {
+        "name": "Blindenergie Bezug (rücksetzbar)"
+      },
+      "resettable_total_active_energy": {
+        "name": "Wirkenergie gesamt (rücksetzbar)"
+      },
+      "resettable_total_reactive_energy": {
+        "name": "Blindenergie gesamt (rücksetzbar)"
+      },
+      "sum_of_line_currents": {
+        "name": "Summe der Leiterströme"
+      },
+      "total_active_energy": {
+        "name": "Wirkenergie gesamt"
+      },
+      "total_active_energy_l1": {
+        "name": "Wirkenergie gesamt L1"
+      },
+      "total_active_energy_l2": {
+        "name": "Wirkenergie gesamt L2"
+      },
+      "total_active_energy_l3": {
+        "name": "Wirkenergie gesamt L3"
+      },
+      "total_ampere_hours": {
+        "name": "Amperestunden gesamt"
+      },
+      "total_apparent_energy": {
+        "name": "Scheinenergie gesamt"
+      },
+      "total_export_active_power": {
+        "name": "Gesamtwirkleistung Einspeisung"
+      },
+      "total_import_active_power": {
+        "name": "Gesamtwirkleistung Bezug"
+      },
+      "total_reactive_energy": {
+        "name": "Blindenergie gesamt"
+      },
+      "total_reactive_energy_l1": {
+        "name": "Blindenergie gesamt L1"
+      },
+      "total_reactive_energy_l2": {
+        "name": "Blindenergie gesamt L2"
+      },
+      "total_reactive_energy_l3": {
+        "name": "Blindenergie gesamt L3"
+      },
+      "total_system_apparent_power": {
+        "name": "Gesamtscheinleistung"
+      },
+      "total_system_apparent_power_demand": {
+        "name": "Gesamtscheinleistung (Bedarf)"
+      },
+      "total_system_phase_angle": {
+        "name": "Gesamtphasenwinkel"
+      },
+      "total_system_power": {
+        "name": "Gesamtwirkleistung"
+      },
+      "total_system_power_demand": {
+        "name": "Gesamtwirkleistung (Bedarf)"
+      },
+      "total_system_power_factor": {
+        "name": "Gesamtleistungsfaktor"
+      },
+      "total_system_reactive_power": {
+        "name": "Gesamtblindleistung"
+      },
+      "total_system_reactive_power_demand": {
+        "name": "Gesamtblindleistung (Bedarf)"
+      },
+      "voltage": {
+        "name": "Spannung"
+      },
+      "voltage_l1": {
+        "name": "Spannung L1"
+      },
+      "voltage_l1_l2": {
+        "name": "Spannung L1-L2"
+      },
+      "voltage_l2": {
+        "name": "Spannung L2"
+      },
+      "voltage_l2_l3": {
+        "name": "Spannung L2-L3"
+      },
+      "voltage_l3": {
+        "name": "Spannung L3"
+      },
+      "voltage_l3_l1": {
+        "name": "Spannung L3-L1"
+      },
+      "voltage_thd_l1": {
+        "name": "Spannungs-THD L1"
+      },
+      "voltage_thd_l1_l2": {
+        "name": "Spannungs-THD L1-L2"
+      },
+      "voltage_thd_l2": {
+        "name": "Spannungs-THD L2"
+      },
+      "voltage_thd_l2_l3": {
+        "name": "Spannungs-THD L2-L3"
+      },
+      "voltage_thd_l3": {
+        "name": "Spannungs-THD L3"
+      },
+      "voltage_thd_l3_l1": {
+        "name": "Spannungs-THD L3-L1"
+      }
     }
   }
 }
