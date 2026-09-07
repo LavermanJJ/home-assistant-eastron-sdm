@@ -203,6 +203,12 @@ If a meter rejects a block read with an illegal-data-address exception, its
 model class in `custom_components/eastron_sdm/sdm/` carries `register_ranges`
 and `max_span` to cut the planner back to what that unit answers.
 
+Some units also need a moment to themselves between one answer and the next
+request. `MESSAGE_SPACING` in `custom_components/eastron_sdm/sdm/const.py`
+holds the models measured to need one — currently the SDM630, at 50 ms — and
+the gap is applied to that meter alone, so the others on the same bus keep
+reading back to back.
+
 ## Troubleshooting
 
 **"No answer from that unit ID."** Work down this list in order — each step
@@ -248,6 +254,12 @@ every meter on a port queues behind the others on one connection, so six meters
 at 2400 baud cannot all be polled every 10 seconds. Raise the scan interval
 under *Configure*, or move the bus to a higher baud rate — all of the meters on
 it, together.
+
+If instead a *single* meter times out while its neighbours on the same wire
+read cleanly, the bus is not the problem: that unit is dropping requests that
+arrive too soon after its own reply. Add it to `MESSAGE_SPACING` (see
+[Polling](#polling)) and open an issue with the model and firmware version, so
+the gap ships for everyone with that meter.
 
 **A meter rejects a block read with an illegal-data-address exception.** Some
 units answer a narrower range than their protocol document promises. Its model

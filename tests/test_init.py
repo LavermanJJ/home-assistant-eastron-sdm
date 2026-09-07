@@ -14,7 +14,7 @@ from modbus_connection.mock import MockModbusUnit
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.eastron_sdm.const import DOMAIN
-from custom_components.eastron_sdm.sdm import SdmModel
+from custom_components.eastron_sdm.sdm import MESSAGE_SPACING, SdmModel
 
 from .conftest import SERIAL_NUMBER, build_unit
 
@@ -223,3 +223,42 @@ async def test_sdm120ct_reporting_the_sdm120_code_is_not_a_mismatch(
         )
         is None
     )
+
+
+async def test_a_meter_that_needs_a_gap_gets_one(
+    hass: HomeAssistant, config_entry: MockConfigEntry
+) -> None:
+    """The SDM630 must be paced, and only for as long as its entry lives.
+
+    The gap lives on the unit, which is handed out from a connection shared
+    with every other entry on the same port. Leaving it set after unload would
+    slow down whatever meter next answers to this unit ID.
+    """
+    unit = build_unit(SdmModel.SDM630)
+    config_entry.add_to_hass(hass)
+    hass.config_entries.async_update_entry(
+        config_entry, data={**config_entry.data, CONF_MODEL: SdmModel.SDM630}
+    )
+    with patch("custom_components.eastron_sdm.async_get_unit", return_value=unit):
+        await hass.config_entries.async_setup(config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    assert config_entry.state is ConfigEntryState.LOADED
+    assert unit.message_spacing == MESSAGE_SPACING[SdmModel.SDM630]
+
+    assert await hass.config_entries.async_unload(config_entry.entry_id)
+    await hass.async_block_till_done()
+    assert unit.message_spacing == 0
+
+
+async def test_a_meter_that_does_not_need_a_gap_keeps_full_speed(
+    hass: HomeAssistant, setup_integration: MockConfigEntry, mock_unit: MockModbusUnit
+) -> None:
+    """A model absent from the table must not be paced.
+
+    ``MESSAGE_SPACING`` is per model precisely so the meters that read cleanly
+    back to back go on doing so.
+    """
+    assert setup_integration.state is ConfigEntryState.LOADED
+    assert SdmModel.SDM120 not in MESSAGE_SPACING
+    assert mock_unit.message_spacing == 0

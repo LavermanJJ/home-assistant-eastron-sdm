@@ -11,7 +11,7 @@ from homeassistant.helpers import issue_registry as ir
 from .connection import build_params
 from .const import CONF_UNIT_ID, DOMAIN
 from .coordinator import SdmConfigEntry, SdmCoordinator
-from .sdm import SdmMeter, SdmModel, contradicting_model
+from .sdm import MESSAGE_SPACING, SdmMeter, SdmModel, contradicting_model
 
 PLATFORMS: list[Platform] = [Platform.BUTTON, Platform.SENSOR]
 
@@ -41,6 +41,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: SdmConfigEntry) -> bool:
             translation_key="bus_settings_conflict",
             translation_placeholders={"error": str(err)},
         ) from err
+
+    if (spacing := MESSAGE_SPACING.get(model)) is not None:
+        # Set before the first read, so the identity and line-settings blocks
+        # below -- themselves several requests in a row -- are already paced.
+        unit.set_message_spacing(spacing)
+        # The pacer belongs to the shared connection and keys on the unit ID,
+        # so a gap set here outlives the entry that asked for it: a later entry
+        # reusing this unit ID on this port would silently inherit it. Clearing
+        # on unload keeps the gap tied to the meter that needs it.
+        entry.async_on_unload(lambda: unit.set_message_spacing(0))
 
     meter = SdmMeter(unit, model)
     # Never raises: identity is optional, and a meter that does not answer is

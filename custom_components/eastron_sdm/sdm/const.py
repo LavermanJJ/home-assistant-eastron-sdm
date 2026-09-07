@@ -158,3 +158,39 @@ DEMAND_RESET_VALUE: int = 0x0000
 #: different reason again: nobody has read their documents. Move one up here
 #: once someone has, not because the family probably shares the address.
 DEMAND_RESET_MODELS: frozenset[SdmModel] = frozenset({SdmModel.SDM120, SdmModel.SDM630})
+
+#: Minimum idle gap between two consecutive requests to the same meter, in
+#: seconds.
+#:
+#: The SDM630 answers the first telegram of a poll and then starts dropping the
+#: ones that follow it back to back. Measured over 15.6 h on a 9600-baud line
+#: carrying one SDM630 and five SDM120, polling every 30 s: 354 failed polls,
+#: 19% of that meter's, distributed over the poll's blocks as
+#:
+#:   0/58  60/48  200/60  260/10  334/48
+#:      2    114      96      73      69
+#:
+#: The block that almost never fails is the only one always preceded by an idle
+#: gap -- the poll's first read follows the scan interval, while the rest follow
+#: their predecessor with no pause at all, since ``message_spacing`` defaults to
+#: zero and the component reads its blocks in one loop.
+#:
+#: Every failure was a timeout: no CRC errors, no exception codes. That is what
+#: rules out block size, the other suspect, and the five-block layout above is
+#: the evidence -- the run was made with ``max_span`` lowered to 60 to test
+#: exactly that, and the meter went on failing at the same rate. An over-long
+#: request is documented to draw an exception response anyway, not silence, so
+#: the ceiling stays at the 80 registers the SDM630 manual states.
+#:
+#: The five SDM120 on the same wire, same adapter, same baud rate read their
+#: four blocks just as tightly -- and at 80 registers a larger frame than
+#: anything the SDM630 asks for -- for three failures in ~8800 polls. So this is
+#: not the line and not the adapter; it is how long this meter needs after
+#: transmitting before it will take the next request addressed to it.
+#:
+#: Applied per unit, not per connection, so the meters that do not need it keep
+#: polling at full speed. 50 ms costs the SDM630 three gaps per poll.
+#:
+#: A model missing here has not been measured, which is not the same as being
+#: known to need no gap.
+MESSAGE_SPACING: dict[SdmModel, float] = {SdmModel.SDM630: 0.05}
