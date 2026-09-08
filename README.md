@@ -209,6 +209,13 @@ holds the models measured to need one — currently the SDM630, at 50 ms — and
 the gap is applied to that meter alone, so the others on the same bus keep
 reading back to back.
 
+That gap is measured against the meter's *own* last reply, because a per-unit
+interval is all the shared connection offers. It therefore does nothing about
+the other meters on the port: when several meters' poll windows drift into each
+other, a request can still go out while a neighbour is mid-frame. Fixing that
+needs a connection-wide interval, which `modbus.async_get_unit()` does not
+expose today.
+
 ## Troubleshooting
 
 **"No answer from that unit ID."** Work down this list in order — each step
@@ -260,6 +267,15 @@ read cleanly, the bus is not the problem: that unit is dropping requests that
 arrive too soon after its own reply. Add it to `MESSAGE_SPACING` (see
 [Polling](#polling)) and open an issue with the model and firmware version, so
 the gap ships for everyone with that meter.
+
+**Several meters on one port time out together, in bursts.** Their poll windows
+have drifted into each other and their requests are landing on a busy line. A
+meter that needs a recovery gap (above) will show this first and worst. Watch
+for it in the debug log: the failing meter reports a timeout while its
+neighbours report the *same* poll taking ten seconds longer than usual —
+they were queued behind it, not failing themselves. Raising one meter's scan
+interval so the windows stop coinciding is the workaround; the real fix is the
+connection-wide interval noted under [Polling](#polling).
 
 **A meter rejects a block read with an illegal-data-address exception.** Some
 units answer a narrower range than their protocol document promises. Its model

@@ -188,8 +188,30 @@ DEMAND_RESET_MODELS: frozenset[SdmModel] = frozenset({SdmModel.SDM120, SdmModel.
 #: not the line and not the adapter; it is how long this meter needs after
 #: transmitting before it will take the next request addressed to it.
 #:
-#: Applied per unit, not per connection, so the meters that do not need it keep
-#: polling at full speed. 50 ms costs the SDM630 three gaps per poll.
+#: Applied per unit, which is all the shared connection offers -- and that is
+#: this fix's ceiling. The gap is measured from this meter's own last reply, so
+#: it says nothing about the five other meters sharing the port. 50 ms costs the
+#: SDM630 three gaps per poll and costs the others nothing.
+#:
+#: What that leaves: six clean hours, 753 consecutive polls, zero failures --
+#: and then the six coordinators drifted into alignment and the meter settled at
+#: ~6%. Reconstructing each poll's window from the debug log (start = finish -
+#: duration) shows the collision directly, the gap between the other five
+#: finishing and this one starting closing one cycle at a time:
+#:
+#:   +3.44s  +2.42s  +1.41s  +0.44s  overlap  overlap
+#:       ok      ok      ok      ok     FAIL     FAIL
+#:
+#: Its first read now goes out while another meter is still on the wire, and is
+#: missed exactly as a too-early read of its own was. The block failing most is
+#: now 0/58, the poll's first: 27% of this meter's failures against 0.6% before.
+#: And it self-perpetuates -- every meter on the port blocks behind the 10 s
+#: timeout, so they all reschedule from the same instant and stay aligned.
+#:
+#: The fix for that is a connection-wide gap, which nothing in the chain
+#: exposes: ``BaseModbusConnection`` takes ``message_spacing`` in its
+#: constructor only, and ``modbus.async_get_unit()`` passes none. Home
+#: Assistant's own YAML hub had the knob as ``message_wait_milliseconds``.
 #:
 #: A model missing here has not been measured, which is not the same as being
 #: known to need no gap.
