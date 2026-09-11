@@ -158,3 +158,67 @@ DEMAND_RESET_VALUE: int = 0x0000
 #: different reason again: nobody has read their documents. Move one up here
 #: once someone has, not because the family probably shares the address.
 DEMAND_RESET_MODELS: frozenset[SdmModel] = frozenset({SdmModel.SDM120, SdmModel.SDM630})
+
+#: Minimum idle gap between two consecutive requests to the same meter, in
+#: seconds.
+#:
+#: The SDM630 answers the first telegram of a poll and then starts dropping the
+#: ones that follow it back to back. Measured over 15.6 h on a 9600-baud line
+#: carrying one SDM630 and five SDM120, polling every 30 s: 354 failed polls,
+#: 19% of that meter's, distributed over the poll's blocks as
+#:
+#:   0/58  60/48  200/60  260/10  334/48
+#:      2    114      96      73      69
+#:
+#: The block that almost never fails is the only one always preceded by an idle
+#: gap -- the poll's first read follows the scan interval, while the rest follow
+#: their predecessor with no pause at all, since ``message_spacing`` defaults to
+#: zero and the component reads its blocks in one loop.
+#:
+#: Every failure was a timeout: no CRC errors, no exception codes. That is what
+#: rules out block size, the other suspect, and the five-block layout above is
+#: the evidence -- the run was made with ``max_span`` lowered to 60 to test
+#: exactly that, and the meter went on failing at the same rate. An over-long
+#: request is documented to draw an exception response anyway, not silence, so
+#: the ceiling stays at the 80 registers the SDM630 manual states.
+#:
+#: The five SDM120 on the same wire, same adapter, same baud rate read their
+#: four blocks just as tightly -- and at 80 registers a larger frame than
+#: anything the SDM630 asks for -- for three failures in ~8800 polls. So this is
+#: not the line and not the adapter; it is how long this meter needs after
+#: transmitting before it will take the next request addressed to it.
+#:
+#: Applied per unit, which is all the shared connection offers -- and that is
+#: this fix's ceiling. The gap is measured from this meter's own last reply, so
+#: it says nothing about the five other meters sharing the port. 50 ms costs the
+#: SDM630 three gaps per poll and costs the others nothing.
+#:
+#: What that leaves: six clean hours, 753 consecutive polls, zero failures --
+#: and then the six coordinators drifted into alignment and the meter settled at
+#: ~6%. Reconstructing each poll's window from the debug log (start = finish -
+#: duration) shows the collision directly, the gap between the other five
+#: finishing and this one starting closing one cycle at a time:
+#:
+#:   +3.44s  +2.42s  +1.41s  +0.44s  overlap  overlap
+#:       ok      ok      ok      ok     FAIL     FAIL
+#:
+#: Its first read now follows a neighbour's frame instead of the scan interval,
+#: and is missed exactly as a too-early read of its own was. Not because the
+#: line is still busy: the RTU transport holds 3.5 character times from the last
+#: byte received, whichever unit sent it, so 4.01 ms at 9600 baud is guaranteed.
+#: That is simply not enough for this meter -- which the 19% baseline already
+#: showed, since those back-to-back reads had the same 4.01 ms and failed anyway.
+#: What it needs is tens of milliseconds of quiet, whoever spoke last. The block
+#: failing most is now 0/58, the poll's first: 27% of this meter's failures
+#: against 0.6% before.
+#: And it self-perpetuates -- every meter on the port blocks behind the 10 s
+#: timeout, so they all reschedule from the same instant and stay aligned.
+#:
+#: The fix for that is a connection-wide gap, which nothing in the chain
+#: exposes: ``BaseModbusConnection`` takes ``message_spacing`` in its
+#: constructor only, and ``modbus.async_get_unit()`` passes none. Home
+#: Assistant's own YAML hub had the knob as ``message_wait_milliseconds``.
+#:
+#: A model missing here has not been measured, which is not the same as being
+#: known to need no gap.
+MESSAGE_SPACING: dict[SdmModel, float] = {SdmModel.SDM630: 0.05}

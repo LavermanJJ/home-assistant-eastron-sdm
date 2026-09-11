@@ -7,6 +7,7 @@ import pytest
 
 from custom_components.eastron_sdm.sdm import (
     MEASUREMENTS,
+    MESSAGE_SPACING,
     METER_CODES,
     PROVISIONAL_METER_CODES,
     SdmMeter,
@@ -239,6 +240,16 @@ def test_provisional_codes_stay_out_of_the_deciding_table() -> None:
     """The two tables must not overlap, or a provisional code would decide."""
     assert not set(PROVISIONAL_METER_CODES) & set(METER_CODES)
     assert set(PROVISIONAL_METER_CODES.values()) <= set(MEASUREMENTS)
+
+
+def test_every_paced_model_is_a_model_that_is_polled() -> None:
+    """A gap keyed on a model nothing reads would never be applied.
+
+    A positive value is the whole point of an entry: zero is what a model
+    absent from the table already gets.
+    """
+    assert set(MESSAGE_SPACING) <= set(MEASUREMENTS)
+    assert all(seconds > 0 for seconds in MESSAGE_SPACING.values())
 
 
 def test_a_contradiction_is_never_raised_from_a_provisional_code() -> None:
