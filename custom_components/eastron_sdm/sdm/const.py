@@ -202,9 +202,15 @@ DEMAND_RESET_MODELS: frozenset[SdmModel] = frozenset({SdmModel.SDM120, SdmModel.
 #:   +3.44s  +2.42s  +1.41s  +0.44s  overlap  overlap
 #:       ok      ok      ok      ok     FAIL     FAIL
 #:
-#: Its first read now goes out while another meter is still on the wire, and is
-#: missed exactly as a too-early read of its own was. The block failing most is
-#: now 0/58, the poll's first: 27% of this meter's failures against 0.6% before.
+#: Its first read now follows a neighbour's frame instead of the scan interval,
+#: and is missed exactly as a too-early read of its own was. Not because the
+#: line is still busy: the RTU transport holds 3.5 character times from the last
+#: byte received, whichever unit sent it, so 4.01 ms at 9600 baud is guaranteed.
+#: That is simply not enough for this meter -- which the 19% baseline already
+#: showed, since those back-to-back reads had the same 4.01 ms and failed anyway.
+#: What it needs is tens of milliseconds of quiet, whoever spoke last. The block
+#: failing most is now 0/58, the poll's first: 27% of this meter's failures
+#: against 0.6% before.
 #: And it self-perpetuates -- every meter on the port blocks behind the 10 s
 #: timeout, so they all reschedule from the same instant and stay aligned.
 #:
